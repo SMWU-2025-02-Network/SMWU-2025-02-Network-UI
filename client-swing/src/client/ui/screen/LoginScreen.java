@@ -110,14 +110,20 @@ public class LoginScreen extends JFrame {
         pwField.setBounds(80, 110, 210, 40);
         box2.add(pwField);
 
-        // 로그인 버튼
+        // 로그인 버튼 (둥글게 적용 안함)
         JPanel box3 = new JPanel(null);
         box3.setBackground(Color.WHITE);
         box3.setBounds(175, 450, 150, 75);
         content.add(box3);
 
         JButton loginBtn = new JButton("로그인");
-        loginBtn.setBounds(0, 0, 150, 75);
+        loginBtn.setBounds(0, 0, 150, 60);
+        try {
+            Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
+            loginBtn.setFont(ttfFont.deriveFont(Font.BOLD, 20f));
+        } catch (Exception ex) {
+            loginBtn.setFont(new Font("SansSerif", Font.BOLD, 20));
+        }
         loginBtn.setBackground(Color.decode("#1B76C0"));
         loginBtn.setForeground(Color.WHITE);
         loginBtn.setFocusPainted(false);
