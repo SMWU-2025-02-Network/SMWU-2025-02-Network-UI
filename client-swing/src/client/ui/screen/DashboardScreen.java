@@ -5,7 +5,8 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
-import java.util.Random;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.IntStream;
 
 public class DashboardScreen extends JPanel {
@@ -17,10 +18,16 @@ public class DashboardScreen extends JPanel {
     private JLabel lightValueLabel;
     private JLabel co2ValueLabel;
 
-    private final Random rnd = new Random();
-    private final Timer updateTimer;
-
     private Font ttfFont;
+
+    // 🔥 센서 히스토리 (최근 N개)
+    private final List<Integer> tempHistory = new ArrayList<>();
+    private final List<Integer> lightHistory = new ArrayList<>();
+    private final List<Integer> co2History = new ArrayList<>();
+    private static final int MAX_POINTS = 30;
+
+    // 현재 그래프에 어떤 종류를 보여줄지
+    private String currentType = "온도"; // "온도" / "조도" / "CO2"
 
     public DashboardScreen() {
         setLayout(new BorderLayout());
@@ -34,7 +41,7 @@ public class DashboardScreen extends JPanel {
             ttfFont = new Font("SansSerif", Font.PLAIN, 18);
         }
 
-        // 상단 박스들
+        // ───────── 상단 박스들 ─────────
         JPanel topBoxes = new JPanel(new GridLayout(1, 3, 10, 0));
         topBoxes.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         topBoxes.setBackground(Color.WHITE);
@@ -49,7 +56,7 @@ public class DashboardScreen extends JPanel {
 
         add(topBoxes, BorderLayout.NORTH);
 
-        // 그래프 영역 패널
+        // ───────── 그래프 영역 ─────────
         JPanel graphPanel = new JPanel(new BorderLayout());
         graphPanel.setBorder(BorderFactory.createLineBorder(Color.GRAY));
         graphPanel.setBackground(Color.WHITE);
@@ -73,47 +80,39 @@ public class DashboardScreen extends JPanel {
         padded.add(graphArea);
         graphPanel.add(padded, BorderLayout.CENTER);
 
-        bottomLabel = new JLabel("평균: 00", SwingConstants.CENTER);
+        bottomLabel = new JLabel("평균: -", SwingConstants.CENTER);
         bottomLabel.setFont(ttfFont.deriveFont(Font.PLAIN, 25f));
         bottomLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 20, 5));
         graphPanel.add(bottomLabel, BorderLayout.SOUTH);
 
         add(graphPanel, BorderLayout.CENTER);
 
-        // 클릭하면 업데이트
+        // ───────── 상단 박스 클릭 → 그래프 타입 변경 ─────────
         tempBox.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
-                int v = parseLabel(tempValueLabel);
-                updateGraph("온도", v);
+                currentType = "온도";
+                updateGraphFromHistory();
             }
         });
         lightBox.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
-                int v = parseLabel(lightValueLabel);
-                updateGraph("조도", v);
+                currentType = "조도";
+                updateGraphFromHistory();
             }
         });
         co2Box.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
-                int v = parseLabel(co2ValueLabel);
-                updateGraph("CO2", v);
+                currentType = "CO2";
+                updateGraphFromHistory();
             }
         });
 
-        // 초기값
-        updateValues(22, 300, 450);
-        updateGraph("온도", parseLabel(tempValueLabel));
-
-        updateTimer = new Timer(2000, e -> {
-            int newTemp = rndIntBetween(18, 26);     // 온도 18~26
-            int newLight = rndIntBetween(0, 800);    // 조도 0~800
-            int newCo2 = rndIntBetween(300, 800);    // CO2 300~800
-            updateValues(newTemp, newLight, newCo2);
-        });
-        updateTimer.setInitialDelay(500);
-        updateTimer.start();
+        // 초기 값 (데이터 없을 때는 0 표시만, 그래프는 비어있음)
+        updateValues(0, 0, 0);
+        updateGraphFromHistory();
     }
 
+    // 상단 박스 하나 (온도/조도/CO2)
     private JPanel createTopBox(String title) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.decode("#DBDBDB"));
@@ -138,57 +137,66 @@ public class DashboardScreen extends JPanel {
         return panel;
     }
 
-    public void updateValues(int temp, int light, int co2) {
-        tempValueLabel.setText(String.format("%d %s", temp, getUnitForType("온도")));
-        lightValueLabel.setText(String.format("%d %s", light, getUnitForType("조도")));
-        co2ValueLabel.setText(String.format("%d %s", co2, getUnitForType("CO2")));
+    // 🔥 서버에서 DASHBOARD_UPDATE 받을 때 호출할 메서드
+    public void updateSensorData(double temp, double light, double co2) {
+        SwingUtilities.invokeLater(() -> {
+            // 1) 상단 값 업데이트
+            updateValues(temp, light, co2);
+
+            // 2) 히스토리에 누적
+            addToHistory(tempHistory, (int) Math.round(temp));
+            addToHistory(lightHistory, (int) Math.round(light));
+            addToHistory(co2History, (int) Math.round(co2));
+
+            // 3) 현재 선택된 타입 기준으로 그래프 갱신
+            updateGraphFromHistory();
+        });
     }
 
-    private void updateGraph(String type, int value) {
-        String unit = getUnitForType(type);
-        topLabel.setText(type + " 변화 그래프 " + "(" + unit + ")");
-        int[] data = generateDummySeries(value, 30, type);
+    // 상단 표시 값 업데이트 (실제 센서 값)
+    public void updateValues(double temp, double light, double co2) {
+        tempValueLabel.setText(String.format("%.1f %s", temp, getUnitForType("온도")));
+        lightValueLabel.setText(String.format("%.0f %s", light, getUnitForType("조도")));
+        co2ValueLabel.setText(String.format("%.0f %s", co2, getUnitForType("CO2")));
+    }
+
+    // history 리스트에 값 추가 (최대 MAX_POINTS만 유지)
+    private void addToHistory(java.util.List<Integer> list, int value) {
+        list.add(value);
+        if (list.size() > MAX_POINTS) {
+            list.remove(0);
+        }
+    }
+
+    // 현재 currentType 기준으로 히스토리에서 데이터 꺼내서 그래프 갱신
+    private void updateGraphFromHistory() {
+        java.util.List<Integer> src;
+        switch (currentType) {
+            case "조도" -> src = lightHistory;
+            case "CO2" -> src = co2History;
+            default -> src = tempHistory;
+        }
+
+        if (src.isEmpty()) {
+            graphArea.removeAll();
+            graphArea.revalidate();
+            graphArea.repaint();
+            bottomLabel.setText("평균 : -");
+            topLabel.setText(currentType + " 변화 그래프 (" + getUnitForType(currentType) + ")");
+            return;
+        }
+
+        int[] data = src.stream().mapToInt(Integer::intValue).toArray();
+        String unit = getUnitForType(currentType);
+
+        topLabel.setText(currentType + " 변화 그래프 (" + unit + ")");
         double avg = IntStream.of(data).average().orElse(0.0);
         bottomLabel.setText(String.format("평균 : %.1f %s", avg, unit));
 
         graphArea.removeAll();
-        graphArea.add(new GraphPanel(data, type, unit, ttfFont), BorderLayout.CENTER);
+        graphArea.add(new GraphPanel(data, currentType, unit, ttfFont), BorderLayout.CENTER);
         graphArea.revalidate();
         graphArea.repaint();
-    }
-
-    private int[] generateDummySeries(int center, int len, String type) {
-        int[] arr = new int[len];
-        int min, max;
-        switch (type) {
-            case "온도": min = 10; max = 35; break;
-            case "조도": min = 0;  max = 1000; break;
-            case "CO2":   min = 0;  max = 5000; break;
-            default:      min = center - 50; max = center + 50;
-        }
-        for (int i = 0; i < len; i++) {
-            int spread = Math.max(1, (max - min) / 6);
-            int v = center + rnd.nextInt(spread * 2 + 1) - spread;
-            v = Math.max(min, Math.min(max, v));
-            arr[i] = v;
-        }
-        return arr;
-    }
-
-    private int rndIntBetween(int a, int b) {
-        return a + rnd.nextInt(b - a + 1);
-    }
-
-    private int parseLabel(JLabel lbl) {
-        try {
-            //숫자만 추출
-            String text = lbl.getText();
-            String digits = text.replaceAll("[^0-9\\-]", ""); // 음수도 가능하게 '-' 허용
-            if (digits.isEmpty()) return 0;
-            return Integer.parseInt(digits);
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     private static String getUnitForType(String type) {
@@ -200,6 +208,7 @@ public class DashboardScreen extends JPanel {
         };
     }
 
+    // ───────── 그래프 그리는 내부 클래스 (기존 그대로) ─────────
     private static class GraphPanel extends JPanel {
         private final int[] data;
         private final String type;
@@ -247,7 +256,7 @@ public class DashboardScreen extends JPanel {
             g2.setColor(Color.BLACK);
             g2.drawRect(padding + labelPadding, padding, graphWidth, graphHeight);
 
-            // Y 라벨 (단위 포함)
+            // Y 라벨
             g2.setFont(font.deriveFont(Font.PLAIN, 11f));
             for (int i = 0; i <= yGridCount; i++) {
                 double yValue = maxValue - i * (maxValue - minValue) / yGridCount;
@@ -262,7 +271,7 @@ public class DashboardScreen extends JPanel {
             int xLabelCount = Math.min(data.length, 6);
             g2.setColor(Color.BLACK);
             for (int i = 0; i < xLabelCount; i++) {
-                int idx = i * (data.length - 1) / (xLabelCount - 1);
+                int idx = (xLabelCount == 1) ? 0 : i * (data.length - 1) / (xLabelCount - 1);
                 String xLabel = String.valueOf(idx);
                 int x = padding + labelPadding + (idx * graphWidth) / (data.length - 1);
                 int labelWidth = g2.getFontMetrics().stringWidth(xLabel);

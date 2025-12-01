@@ -16,6 +16,17 @@ public class SocketClient {
     private PrintWriter out;
     private BufferedReader in;
 
+    // 메시지 콜백
+    private MessageListener listener;
+
+    public interface MessageListener {
+        void onMessage(SocketMessage msg);
+    }
+
+    public void setListener(MessageListener listener) {
+        this.listener = listener;
+    }
+
     /**
      * 서버 연결
      */
@@ -24,7 +35,23 @@ public class SocketClient {
         out = new PrintWriter(socket.getOutputStream(), true);
         in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-        System.out.println("[CLIENT] 서버 연결 완료: " + host + ":" + port);
+        // 수신 스레드 시작
+        Thread receiveThread = new Thread(() -> {
+            try {
+                String line;
+                while ((line = in.readLine()) != null) {
+                    SocketMessage msg = gson.fromJson(line, SocketMessage.class);
+
+                    if (listener != null) {
+                        listener.onMessage(msg);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("[SocketClient] 수신 스레드 종료: " + e.getMessage());
+            }
+        });
+
+        receiveThread.start();
     }
 
     /**

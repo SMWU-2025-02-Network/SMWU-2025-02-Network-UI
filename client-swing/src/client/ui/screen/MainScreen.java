@@ -18,14 +18,14 @@ public class MainScreen extends JFrame {
 
     private JLabel floorTitle;
 
-    // 🔥 네트워크/사용자/위치 정보
+    // 네트워크/사용자/위치 정보
     private final SocketClient socketClient;
     private final String userId;
     private final int floor;
     private final String room;
     private final String displayFloorName;   // "2층 A" 같은 표시용 텍스트
 
-    // 🔥 FloorSelectionScreen에서 socketClient + userId + floor + room을 넘겨받음
+    // FloorSelectionScreen에서 socketClient + userId + floor + room을 넘겨받음
     public MainScreen(SocketClient socketClient, String userId, int floor, String room) {
         this.socketClient = socketClient;
         this.userId = userId;
@@ -96,6 +96,32 @@ public class MainScreen extends JFrame {
         centerPanel.add(seatScreen, "SEAT");
 
         cardLayout.show(centerPanel, "CHAT");
+
+        if (socketClient != null) {
+            socketClient.setListener(msg -> {
+                // CHAT 메시지면 채팅창에 추가
+                if ("CHAT".equals(msg.getType())) {
+                    // SYSTEM, 본인, 다른 유저 모두 여기로 옴
+                    String sender = msg.getSender() != null ? msg.getSender() : "SYSTEM";
+                    String text = msg.getMsg();
+                    chatScreen.appendMessage(sender, text);
+                }
+
+                // 센서 대시보드 업데이트
+                else if ("DASHBOARD_UPDATE".equals(msg.getType())) {
+                    Double temp = msg.getTemp();
+                    Double lux  = msg.getLux();
+                    Double co2  = msg.getCo2();
+
+                    if (temp != null && lux != null && co2 != null) {
+                        dashScreen.updateSensorData(temp, lux, co2);
+                    }
+                }
+
+                // 나중에 SEAT_UPDATE 같은 것도 여기서 처리 가능
+                // else if ("SEAT_UPDATE".equals(msg.getType())) { ... }
+            });
+        }
 
         // ───────────────── 하단 탭 바 ─────────────────
         JPanel bottomBar = new JPanel(null);
