@@ -33,7 +33,13 @@ public class MainScreen extends JFrame {
         this.room = room;
 
         // "2층", "2층 A" 같은 표시용 이름
-        this.displayFloorName = floor + "층" + (room != null ? " " + room : "");
+        if (floor == 3 || floor == 4 || floor == 6) {
+            this.displayFloorName = floor + "층";
+        } else if (room != null && !room.isBlank()) {
+            this.displayFloorName = floor + "층 " + room;
+        } else {
+            this.displayFloorName = floor + "층";
+        }
 
         setTitle("Netlibrary - 메인화면");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
