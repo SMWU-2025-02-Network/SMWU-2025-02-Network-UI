@@ -1,5 +1,7 @@
 package client.ui.screen;
 
+import client.socket.SocketClient;
+import client.socket.SocketMessage;
 import client.ui.SeatPanel;
 
 import javax.swing.*;
@@ -7,8 +9,10 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 
 public class SeatMapScreen extends JPanel {
+
     private final ArrayList<SeatPanel> seats = new ArrayList<>();
     private final JLabel infoLabel;
     private final JButton confirmButton, outButton, homeButton, returnButton, changeButton;
@@ -19,7 +23,19 @@ public class SeatMapScreen extends JPanel {
 
     private Font ttfFont; // 커스텀 폰트
 
-    public SeatMapScreen() {
+    // 소켓 & 사용자 & 위치 정보 추가
+    private final SocketClient socketClient;
+    private final String userId;
+    private final int floor;
+    private final String room;
+
+    // 생성자 변경: 네트워크 정보 주입
+    public SeatMapScreen(SocketClient socketClient, String userId, int floor, String room) {
+        this.socketClient = socketClient;
+        this.userId = userId;
+        this.floor = floor;
+        this.room = room;
+
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
@@ -31,6 +47,7 @@ public class SeatMapScreen extends JPanel {
             ttfFont = new Font("SansSerif", Font.PLAIN, 16);
         }
 
+        // ====== 중앙 좌석 그리드 ======
         JPanel seatGrid = new JPanel(new GridLayout(0, 5, 10, 10));
         seatGrid.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         add(seatGrid, BorderLayout.CENTER);
@@ -48,8 +65,9 @@ public class SeatMapScreen extends JPanel {
             });
         }
 
+        // ====== 하단 영역 ======
         JPanel bottom = new JPanel(new BorderLayout());
-        bottom.setBorder(BorderFactory.createEmptyBorder(8,8,8,8));
+        bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         add(bottom, BorderLayout.SOUTH);
 
         infoLabel = new JLabel("선택 좌석: -", SwingConstants.CENTER);
@@ -104,15 +122,91 @@ public class SeatMapScreen extends JPanel {
         changeButton.setVisible(false);
         btns.add(changeButton);
 
+        // ====== 버튼 이벤트 ======
+
+        // 좌석 선택 후 서버에 CHECKIN 전송
         confirmButton.addActionListener(e -> onConfirm());
-        outButton.addActionListener(e -> { if (mySeat!=null) mySeat.startOutTimer(60*60); });
-        homeButton.addActionListener(e -> { if (mySeat!=null) mySeat.stopOutTimer(); });
+
+        // 외출 시작 (AWAY_START)
+        outButton.addActionListener(e -> onAwayStart());
+
+        // 외출 복귀 (AWAY_BACK)
+        homeButton.addActionListener(e -> onAwayBack());
+
+        // 좌석 반납 (CHECKOUT)
         returnButton.addActionListener(e -> onReturn());
+
+        // 좌석 변경 모드
         changeButton.addActionListener(e -> enterChangeMode());
     }
 
+    // ================== 소켓과 연동되는 부분 ==================
+
+    // 서버에서 오는 SEAT_UPDATE 적용
+    // msg.getSeats() 타입에 맞춰서 제네릭 바꿔줘 (예: List<SocketMessage.SeatInfo>)
+    public void applySeatUpdate(List<? /* 또는 SeatInfo 타입 */> seatInfos) {
+
+        // 서버 DTO에 맞게 캐스팅해서 쓰면 됨 (여기서는 예시 타입 이름 SeatInfo로 가정)
+        for (Object o : seatInfos) {
+            // TODO: 실제 타입으로 캐스팅
+            // 예: SocketMessage.SeatInfo info = (SocketMessage.SeatInfo) o;
+            var info = (SocketMessage.SeatInfo) o; // 네 프로젝트에 맞게 수정
+
+            int seatNo = info.getSeatNo();     // 1~20
+            String status = info.getStatus();  // "EMPTY", "IN_USE", "AWAY"
+            String seatUserId = info.getUserId(); // null or userId
+            Integer remainSec = info.getRemainSeconds(); // 남은 시간 (있으면)
+
+            if (seatNo < 1 || seatNo > seats.size()) continue;
+            SeatPanel seatPanel = seats.get(seatNo - 1);
+
+            // 기본 초기화
+            seatPanel.resetSeat();
+
+            if ("EMPTY".equals(status)) {
+                // 비어있는 좌석
+                continue;
+            }
+
+            // 내가 쓰는 좌석인지 확인
+            boolean isMine = (seatUserId != null && seatUserId.equals(userId));
+
+            if ("IN_USE".equals(status)) {
+                if (isMine) {
+                    mySeat = seatPanel;
+                    if (remainSec != null && remainSec > 0) {
+                        seatPanel.setMineWithRemaining(remainSec);
+                    } else {
+                        seatPanel.setMineDefault();
+                    }
+                } else {
+                    seatPanel.setOccupied(); // 다른 사람 자리
+                }
+            } else if ("AWAY".equals(status)) {
+                if (isMine) {
+                    mySeat = seatPanel;
+                    if (remainSec != null && remainSec > 0) {
+                        // SeatPanel에서 외출 상태 표시 + 타이머 있는 버전으로 처리
+                        seatPanel.setMineWithRemaining(remainSec);
+                        seatPanel.startOutTimer(remainSec);
+                    } else {
+                        seatPanel.setMineDefault();
+                    }
+                } else {
+                    seatPanel.setAway(); // 남의 외출좌석 (필요하면 색 다르게)
+                }
+            }
+        }
+
+        // infoLabel 갱신
+        updateInfoLabel();
+    }
+
+    // ================== 좌석 클릭/버튼 로직 ==================
+
     // 좌석 클릭
     public void onSeatClicked(SeatPanel p) {
+        // 이미 다른 사람이 쓰는 자리면 선택 불가
         if (p.getState() != SeatPanel.State.EMPTY) return;
 
         boolean allowSelect = (mySeat == null) || changeMode;
@@ -130,62 +224,102 @@ public class SeatMapScreen extends JPanel {
         updateInfoLabel();
     }
 
+    // 🔥 좌석 선택 완료 → 서버에 CHECKIN (또는 변경이면 CHECKOUT + CHECKIN)
     private void onConfirm() {
         if (selectedSeat == null) return;
 
+        int seatNo = selectedSeat.getSeatNumber();
+
         if (changeMode && mySeat != null) {
-            int remaining = mySeat.getRemainingSeconds();
-            int outRem = mySeat.getOutRemainingSeconds();
-            boolean wasOut = mySeat.isOutActive();
+            // 기존 좌석 반납 + 새 좌석 체크인
+            int oldSeatNo = mySeat.getSeatNumber();
 
-            mySeat.resetSeat();
+            // 1) 기존 좌석 CHECKOUT
+            socketClient.send(SocketMessage.builder()
+                    .type("CHECKOUT")
+                    .floor(floor)
+                    .room(room)
+                    .seatNo(oldSeatNo)
+                    .userId(userId)
+                    .build());
 
-            mySeat = selectedSeat;
-            mySeat.setMineWithRemaining(remaining);
-            if (wasOut && outRem > 0) mySeat.startOutTimer(outRem);
+            // 2) 새 좌석 CHECKIN
+            socketClient.send(SocketMessage.builder()
+                    .type("CHECKIN")
+                    .floor(floor)
+                    .room(room)
+                    .seatNo(seatNo)
+                    .userId(userId)
+                    .build());
 
             changeMode = false;
             selectedSeat = null;
 
             confirmButton.setVisible(false);
             confirmButton.setEnabled(false);
-            outButton.setVisible(true);
-            homeButton.setVisible(true);
-            returnButton.setVisible(true);
-            changeButton.setVisible(true);
             confirmButton.setText("선택완료");
 
-            infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber());
         } else {
-            mySeat = selectedSeat;
-            mySeat.setMineDefault();
-            selectedSeat = null;
+            // 일반 CHECKIN
+            socketClient.send(SocketMessage.builder()
+                    .type("CHECKIN")
+                    .floor(floor)
+                    .room(room)
+                    .seatNo(seatNo)
+                    .userId(userId)
+                    .build());
 
+            selectedSeat = null;
             confirmButton.setVisible(false);
             confirmButton.setEnabled(false);
-            outButton.setVisible(true);
-            homeButton.setVisible(true);
-            returnButton.setVisible(true);
-            changeButton.setVisible(true);
-
-            infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber());
         }
+
+        // 실제 좌석 반영은 서버에서 SEAT_UPDATE 오면 applySeatUpdate()에서 처리
     }
 
+    // 🔥 외출 시작 (AWAY_START)
+    private void onAwayStart() {
+        if (mySeat == null) return;
+        int seatNo = mySeat.getSeatNumber();
+
+        socketClient.send(SocketMessage.builder()
+                .type("AWAY_START")
+                .floor(floor)
+                .room(room)
+                .seatNo(seatNo)
+                .userId(userId)
+                .build());
+    }
+
+    // 🔥 외출 복귀 (AWAY_BACK)
+    private void onAwayBack() {
+        if (mySeat == null) return;
+        int seatNo = mySeat.getSeatNumber();
+
+        socketClient.send(SocketMessage.builder()
+                .type("AWAY_BACK")
+                .floor(floor)
+                .room(room)
+                .seatNo(seatNo)
+                .userId(userId)
+                .build());
+    }
+
+    // 🔥 좌석 반납 (CHECKOUT)
     private void onReturn() {
         if (mySeat == null) return;
-        mySeat.resetSeat();
-        mySeat = null;
-        selectedSeat = null;
+        int seatNo = mySeat.getSeatNumber();
 
-        infoLabel.setText("선택 좌석: -");
-        confirmButton.setVisible(true);
-        confirmButton.setEnabled(false);
-        confirmButton.setText("선택완료");
-        outButton.setVisible(false);
-        homeButton.setVisible(false);
-        returnButton.setVisible(false);
-        changeButton.setVisible(false);
+        socketClient.send(SocketMessage.builder()
+                .type("CHECKOUT")
+                .floor(floor)
+                .room(room)
+                .seatNo(seatNo)
+                .userId(userId)
+                .build());
+
+        // 실제 mySeat 초기화는 SEAT_UPDATE 이후 applySeatUpdate에서 처리
+        selectedSeat = null;
     }
 
     private void enterChangeMode() {
@@ -215,6 +349,3 @@ public class SeatMapScreen extends JPanel {
         }
     }
 }
-
-
-
