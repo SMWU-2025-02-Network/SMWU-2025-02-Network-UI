@@ -21,7 +21,7 @@ public class SocketMessage {
     private Double co2;
     private Double lux;
 
-    // SEAT_UPDATE용 좌석 리스트 추가
+    // 좌석 목록
     private List<SeatInfo> seats;
 
     // --- 내부 클래스: 좌석 상태 정보 ---

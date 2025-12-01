@@ -85,11 +85,9 @@ public class MainScreen extends JFrame {
         centerPanel = new JPanel(cardLayout);
         root.add(centerPanel, BorderLayout.CENTER);
 
-        // TODO: 나중에 DashboardScreen/SeatMapScreen도
-        //       socketClient, userId, floor, room을 넘겨서 생성하면 됨
         chatScreen = new ChatScreen(socketClient, userId, floor, room);
         dashScreen = new DashboardScreen();
-        seatScreen = new SeatMapScreen();
+        seatScreen = new SeatMapScreen(socketClient, userId, floor, room);
 
         centerPanel.add(chatScreen, "CHAT");
         centerPanel.add(dashScreen, "DASH");

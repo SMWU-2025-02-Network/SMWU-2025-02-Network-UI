@@ -20,7 +20,7 @@ public class DashboardScreen extends JPanel {
 
     private Font ttfFont;
 
-    // 🔥 센서 히스토리 (최근 N개)
+    //  센서 히스토리 (최근 N개)
     private final List<Integer> tempHistory = new ArrayList<>();
     private final List<Integer> lightHistory = new ArrayList<>();
     private final List<Integer> co2History = new ArrayList<>();
@@ -137,7 +137,7 @@ public class DashboardScreen extends JPanel {
         return panel;
     }
 
-    // 🔥 서버에서 DASHBOARD_UPDATE 받을 때 호출할 메서드
+    // 서버에서 DASHBOARD_UPDATE 받을 때 호출할 메서드
     public void updateSensorData(double temp, double light, double co2) {
         SwingUtilities.invokeLater(() -> {
             // 1) 상단 값 업데이트
@@ -246,6 +246,9 @@ public class DashboardScreen extends JPanel {
             int graphWidth = width - (2 * padding) - labelPadding;
             int graphHeight = height - 2 * padding;
 
+            int len = data.length;
+            int denom = Math.max(1, len - 1);
+
             int yGridCount = 6;
             g2.setColor(gridColor);
             for (int i = 0; i <= yGridCount; i++) {
@@ -273,12 +276,12 @@ public class DashboardScreen extends JPanel {
             for (int i = 0; i < xLabelCount; i++) {
                 int idx = (xLabelCount == 1) ? 0 : i * (data.length - 1) / (xLabelCount - 1);
                 String xLabel = String.valueOf(idx);
-                int x = padding + labelPadding + (idx * graphWidth) / (data.length - 1);
+                int x = padding + labelPadding + (idx * graphWidth) / denom;
                 int labelWidth = g2.getFontMetrics().stringWidth(xLabel);
                 g2.drawString(xLabel, x - labelWidth / 2, padding + graphHeight + 16);
             }
 
-            double xScale = (double) graphWidth / (data.length - 1);
+            double xScale = (double) graphWidth / denom;
             double yScale = (double) graphHeight / (maxValue - minValue);
 
             java.util.List<Point> graphPoints = new java.util.ArrayList<>();

@@ -134,6 +134,7 @@ public class SeatPanel extends JPanel {
         outTimer.start();
     }
 
+
     public void stopOutTimer() {
         if (outTimer != null) { outTimer.stop(); outTimer = null; }
         outRemainingSeconds = 0;
