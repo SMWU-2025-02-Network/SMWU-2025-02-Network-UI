@@ -20,7 +20,7 @@ public class DashboardScreen extends JPanel {
     private final Random rnd = new Random();
     private final Timer updateTimer;
 
-    private Font ttfFont; // 커스텀 폰트
+    private Font ttfFont;
 
     public DashboardScreen() {
         setLayout(new BorderLayout());
@@ -100,8 +100,9 @@ public class DashboardScreen extends JPanel {
             }
         });
 
+        // 초기값
         updateValues(22, 300, 450);
-        updateGraph("온도", Integer.parseInt(tempValueLabel.getText()));
+        updateGraph("온도", parseLabel(tempValueLabel));
 
         updateTimer = new Timer(2000, e -> {
             int newTemp = rndIntBetween(18, 26);     // 온도 18~26
@@ -123,7 +124,7 @@ public class DashboardScreen extends JPanel {
         label.setFont(ttfFont.deriveFont(Font.BOLD, 18f));
         panel.add(label, BorderLayout.NORTH);
 
-        JLabel valueLabel = new JLabel("0", SwingConstants.CENTER);
+        JLabel valueLabel = new JLabel("0 " + getUnitForType(title), SwingConstants.CENTER);
         valueLabel.setFont(ttfFont.deriveFont(Font.PLAIN, 25f));
         panel.add(valueLabel, BorderLayout.CENTER);
 
@@ -138,19 +139,20 @@ public class DashboardScreen extends JPanel {
     }
 
     public void updateValues(int temp, int light, int co2) {
-        tempValueLabel.setText(String.valueOf(temp));
-        lightValueLabel.setText(String.valueOf(light));
-        co2ValueLabel.setText(String.valueOf(co2));
+        tempValueLabel.setText(String.format("%d %s", temp, getUnitForType("온도")));
+        lightValueLabel.setText(String.format("%d %s", light, getUnitForType("조도")));
+        co2ValueLabel.setText(String.format("%d %s", co2, getUnitForType("CO2")));
     }
 
     private void updateGraph(String type, int value) {
-        topLabel.setText(type + " 변화 그래프");
+        String unit = getUnitForType(type);
+        topLabel.setText(type + " 변화 그래프 " + "(" + unit + ")");
         int[] data = generateDummySeries(value, 30, type);
         double avg = IntStream.of(data).average().orElse(0.0);
-        bottomLabel.setText(String.format("평균 %s: %.1f", type, avg));
+        bottomLabel.setText(String.format("평균 : %.1f %s", avg, unit));
 
         graphArea.removeAll();
-        graphArea.add(new GraphPanel(data, type, ttfFont), BorderLayout.CENTER);
+        graphArea.add(new GraphPanel(data, type, unit, ttfFont), BorderLayout.CENTER);
         graphArea.revalidate();
         graphArea.repaint();
     }
@@ -179,15 +181,29 @@ public class DashboardScreen extends JPanel {
 
     private int parseLabel(JLabel lbl) {
         try {
-            return Integer.parseInt(lbl.getText());
+            //숫자만 추출
+            String text = lbl.getText();
+            String digits = text.replaceAll("[^0-9\\-]", ""); // 음수도 가능하게 '-' 허용
+            if (digits.isEmpty()) return 0;
+            return Integer.parseInt(digits);
         } catch (Exception e) {
             return 0;
         }
     }
 
+    private static String getUnitForType(String type) {
+        return switch (type) {
+            case "온도" -> "'C";
+            case "조도" -> "lux";
+            case "CO2" -> "ppm";
+            default -> "";
+        };
+    }
+
     private static class GraphPanel extends JPanel {
         private final int[] data;
         private final String type;
+        private final String unit;
         private final Font font;
         private final int padding = 40;
         private final int labelPadding = 30;
@@ -196,9 +212,10 @@ public class DashboardScreen extends JPanel {
         private final Color lineColor = new Color(100, 149, 237);
         private final Color pointColor = new Color(65, 105, 225);
 
-        public GraphPanel(int[] data, String type, Font font) {
+        public GraphPanel(int[] data, String type, String unit, Font font) {
             this.data = data;
             this.type = type;
+            this.unit = unit;
             this.font = font;
             setBackground(Color.WHITE);
             setPreferredSize(new Dimension(760, 320));
@@ -230,11 +247,11 @@ public class DashboardScreen extends JPanel {
             g2.setColor(Color.BLACK);
             g2.drawRect(padding + labelPadding, padding, graphWidth, graphHeight);
 
-            // Y 라벨
+            // Y 라벨 (단위 포함)
             g2.setFont(font.deriveFont(Font.PLAIN, 11f));
             for (int i = 0; i <= yGridCount; i++) {
                 double yValue = maxValue - i * (maxValue - minValue) / yGridCount;
-                String yLabel = String.format("%.0f", yValue);
+                String yLabel = String.format("%.0f%s", yValue, unit);
                 int y = padding + (i * graphHeight) / yGridCount;
                 int labelWidth = g2.getFontMetrics().stringWidth(yLabel);
                 g2.setColor(Color.BLACK);
@@ -279,12 +296,11 @@ public class DashboardScreen extends JPanel {
             double avg = IntStream.of(data).average().orElse(0.0);
             g2.setFont(font.deriveFont(Font.BOLD, 12f));
             g2.setColor(Color.DARK_GRAY);
-            g2.drawString("Latest: " + lastVal, padding + labelPadding + 6, padding + 14);
-            g2.drawString(String.format("Avg: %.1f", avg), width - padding - 80, padding + 14);
+            g2.drawString("Latest: " + lastVal + unit, padding + labelPadding + 6, padding + 14);
+            g2.drawString(String.format("Avg: %.1f%s", avg, unit), width - padding - 120, padding + 14);
 
             g2.setFont(font.deriveFont(Font.BOLD, 14f));
-            g2.drawString(type, padding + 6, padding - 6);
+            g2.drawString(type + " (" + unit + ")", padding + 6, padding - 6);
         }
     }
 }
-

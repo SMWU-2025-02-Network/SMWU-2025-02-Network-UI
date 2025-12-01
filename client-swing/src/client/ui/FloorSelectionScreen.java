@@ -95,23 +95,16 @@ public class FloorSelectionScreen extends JFrame {
             } catch (Exception ex) {
                 btn.setFont(new Font("SansSerif", Font.BOLD, 20));
             }
+
+            String name = btnNames[i];
+            btn.addActionListener(e -> {
+                // 선택한 층 이름을 MainScreen에 전달
+                new MainScreen(name).setVisible(true);
+                dispose();
+            });
+
             floor.add(btn);
         }
-
-        // 마지막 버튼 클릭 이벤트 (1층 B)
-        floor.getComponent(8).addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                try {
-                    MainScreen select = new MainScreen();
-                    select.setVisible(true);
-                    FloorSelectionScreen.this.dispose();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    JOptionPane.showMessageDialog(null, "채팅 화면 생성 실패");
-                }
-            }
-        });
 
         setVisible(true);
     }

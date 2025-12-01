@@ -13,7 +13,12 @@ public class MainScreen extends JFrame {
     private DashboardScreen dashScreen;
     private SeatMapScreen seatScreen;
 
-    public MainScreen() {
+    private final String selectedFloor;
+    private JLabel floorTitle; // <-- 인스턴스 필드로 변경
+
+    public MainScreen(String selectedFloor) {
+        this.selectedFloor = selectedFloor;
+
         setTitle("Netlibrary - 메인화면");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(500, 800);
@@ -46,8 +51,8 @@ public class MainScreen extends JFrame {
         });
         topBar.add(backBtn, BorderLayout.WEST);
 
-        // 상단바 제목
-        JLabel floorTitle = new JLabel("1층B 대화방", SwingConstants.CENTER);
+        // 상단바 제목 (인스턴스 변수로)
+        floorTitle = new JLabel(selectedFloor + " 대화방", SwingConstants.CENTER);
         floorTitle.setForeground(Color.BLACK);
         try {
             Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
@@ -103,11 +108,11 @@ public class MainScreen extends JFrame {
                 else if (idx == 1) cardLayout.show(centerPanel, "DASH");
                 else cardLayout.show(centerPanel, "SEAT");
 
-                // 상단 제목 변경
+                //제목 변경
                 switch (idx) {
-                    case 0 -> floorTitle.setText("1층B 대화방");
-                    case 1 -> floorTitle.setText("1층B 대시보드");
-                    case 2 -> floorTitle.setText("1층B 좌석");
+                    case 0 -> floorTitle.setText(selectedFloor + " 대화방");
+                    case 1 -> floorTitle.setText(selectedFloor + " 대시보드");
+                    case 2 -> floorTitle.setText(selectedFloor + " 좌석");
                 }
             });
         }
