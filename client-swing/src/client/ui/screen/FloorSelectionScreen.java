@@ -120,7 +120,13 @@ public class FloorSelectionScreen extends JFrame {
                 if (text.contains("층")) {
                     String[] arr = text.split(" ");
                     floorNum = Integer.parseInt(arr[0].replace("층", ""));
-                    room = (arr.length == 1 ? null : arr[1]);
+
+                    // 단일 구역 층은 기본 room 을 "A" 로
+                    if (arr.length == 1) {
+                        room = "A";          // ← 원래는 null 이었음
+                    } else {
+                        room = arr[1];       // "A" or "B"
+                    }
                 } else {
                     JOptionPane.showMessageDialog(this, "층 정보를 읽을 수 없습니다.");
                     return;
