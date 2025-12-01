@@ -1,4 +1,6 @@
-package client.ui;
+package client.ui.screen;
+
+import client.ui.SeatPanel;
 
 import javax.swing.*;
 import java.awt.*;

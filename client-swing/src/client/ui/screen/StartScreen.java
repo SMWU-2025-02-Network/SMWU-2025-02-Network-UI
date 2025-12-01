@@ -1,4 +1,4 @@
-package client.ui;
+package client.ui.screen;
 
 import client.socket.SocketClient;
 
@@ -33,8 +33,7 @@ public class StartScreen extends JFrame{
                     JOptionPane.ERROR_MESSAGE
             );
             // 서버 없으면 프로그램 종료
-            System.exit(1);
-
+            //System.exit(1);
         }
 
         JPanel panel = new JPanel(null);

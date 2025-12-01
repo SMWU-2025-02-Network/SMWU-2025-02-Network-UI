@@ -1,4 +1,6 @@
-package client.ui;
+package client.ui.screen;
+
+import client.socket.SocketClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -6,6 +8,7 @@ import java.awt.*;
 import java.io.File;
 
 public class MainScreen extends JFrame {
+
     private CardLayout cardLayout;
     private JPanel centerPanel;
 
@@ -13,11 +16,24 @@ public class MainScreen extends JFrame {
     private DashboardScreen dashScreen;
     private SeatMapScreen seatScreen;
 
-    private final String selectedFloor;
-    private JLabel floorTitle; // <-- 인스턴스 필드로 변경
+    private JLabel floorTitle;
 
-    public MainScreen(String selectedFloor) {
-        this.selectedFloor = selectedFloor;
+    // 🔥 네트워크/사용자/위치 정보
+    private final SocketClient socketClient;
+    private final String userId;
+    private final int floor;
+    private final String room;
+    private final String displayFloorName;   // "2층 A" 같은 표시용 텍스트
+
+    // 🔥 FloorSelectionScreen에서 socketClient + userId + floor + room을 넘겨받음
+    public MainScreen(SocketClient socketClient, String userId, int floor, String room) {
+        this.socketClient = socketClient;
+        this.userId = userId;
+        this.floor = floor;
+        this.room = room;
+
+        // "2층", "2층 A" 같은 표시용 이름
+        this.displayFloorName = floor + "층" + (room != null ? " " + room : "");
 
         setTitle("Netlibrary - 메인화면");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -28,7 +44,7 @@ public class MainScreen extends JFrame {
         root.setBackground(Color.WHITE);
         setContentPane(root);
 
-        // 상단 바
+        // ───────────────── 상단 바 ─────────────────
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setBackground(Color.decode("#DBDBDB"));
         topBar.setPreferredSize(new Dimension(0, 50));
@@ -45,14 +61,14 @@ public class MainScreen extends JFrame {
         backBtn.setFocusPainted(false);
         backBtn.setOpaque(false);
         backBtn.addActionListener(e -> {
-            FloorSelectionScreen floorScreen = new FloorSelectionScreen();
-            floorScreen.setVisible(true);
+            //  층 선택 화면으로 돌아갈 때도 socketClient, userId 유지
+            new FloorSelectionScreen(socketClient, userId).setVisible(true);
             dispose();
         });
         topBar.add(backBtn, BorderLayout.WEST);
 
-        // 상단바 제목 (인스턴스 변수로)
-        floorTitle = new JLabel(selectedFloor + " 대화방", SwingConstants.CENTER);
+        // 상단바 제목
+        floorTitle = new JLabel(displayFloorName + " 대화방", SwingConstants.CENTER);
         floorTitle.setForeground(Color.BLACK);
         try {
             Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
@@ -64,12 +80,14 @@ public class MainScreen extends JFrame {
         topBar.add(floorTitle, BorderLayout.CENTER);
         topBar.add(Box.createHorizontalStrut(backBtn.getPreferredSize().width), BorderLayout.EAST);
 
-        // 중앙 - CardLayout
+        // ───────────────── 중앙 (CardLayout) ─────────────────
         cardLayout = new CardLayout();
         centerPanel = new JPanel(cardLayout);
         root.add(centerPanel, BorderLayout.CENTER);
 
-        chatScreen = new ChatScreen();
+        // TODO: 나중에 DashboardScreen/SeatMapScreen도
+        //       socketClient, userId, floor, room을 넘겨서 생성하면 됨
+        chatScreen = new ChatScreen(socketClient, userId, floor, room);
         dashScreen = new DashboardScreen();
         seatScreen = new SeatMapScreen();
 
@@ -79,7 +97,7 @@ public class MainScreen extends JFrame {
 
         cardLayout.show(centerPanel, "CHAT");
 
-        // 하단 바
+        // ───────────────── 하단 탭 바 ─────────────────
         JPanel bottomBar = new JPanel(null);
         bottomBar.setBackground(Color.decode("#DBDBDB"));
         bottomBar.setPreferredSize(new Dimension(0, 60));
@@ -102,17 +120,17 @@ public class MainScreen extends JFrame {
             }
             bottomBar.add(btn);
 
-            int idx = i;
+            final int idx = i;
             btn.addActionListener(e -> {
                 if (idx == 0) cardLayout.show(centerPanel, "CHAT");
                 else if (idx == 1) cardLayout.show(centerPanel, "DASH");
                 else cardLayout.show(centerPanel, "SEAT");
 
-                //제목 변경
+                // 상단 제목 변경
                 switch (idx) {
-                    case 0 -> floorTitle.setText(selectedFloor + " 대화방");
-                    case 1 -> floorTitle.setText(selectedFloor + " 대시보드");
-                    case 2 -> floorTitle.setText(selectedFloor + " 좌석");
+                    case 0 -> floorTitle.setText(displayFloorName + " 대화방");
+                    case 1 -> floorTitle.setText(displayFloorName + " 대시보드");
+                    case 2 -> floorTitle.setText(displayFloorName + " 좌석");
                 }
             });
         }

@@ -1,6 +1,7 @@
-package client.ui;
+package client.ui.screen;
 
 import client.socket.SocketClient;
+import client.socket.SocketMessage;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -45,7 +46,7 @@ public class LoginScreen extends JFrame {
         });
         topBar.add(backBtn, BorderLayout.WEST);
 
-        // 상단바 제목
+        // 상단 제목
         JLabel loginTitle = new JLabel("로그인", SwingConstants.CENTER);
         loginTitle.setForeground(Color.BLACK);
         try {
@@ -53,7 +54,6 @@ public class LoginScreen extends JFrame {
             loginTitle.setFont(ttfFont.deriveFont(Font.BOLD, 24f));
         } catch (Exception ex) {
             loginTitle.setFont(new Font("SansSerif", Font.BOLD, 18));
-            ex.printStackTrace();
         }
         topBar.add(loginTitle, BorderLayout.CENTER);
         topBar.add(Box.createHorizontalStrut(backBtn.getPreferredSize().width), BorderLayout.EAST);
@@ -73,57 +73,44 @@ public class LoginScreen extends JFrame {
             titleLabel.setFont(ttfFont.deriveFont(Font.BOLD, 40f));
         } catch (Exception ex) {
             titleLabel.setFont(new Font("SansSerif", Font.BOLD, 28));
-            ex.printStackTrace();
         }
         box1.add(titleLabel);
 
-        // 아이디, 비밀번호 박스
+        // 아이디/비밀번호 입력 영역
         JPanel box2 = new JPanel(null);
         box2.setBackground(Color.WHITE);
         box2.setBounds(100, 230, 300, 175);
         content.add(box2);
 
         JLabel idLabel = new JLabel("아이디");
+        idLabel.setBounds(5, 25, 75, 40);
         try {
             Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
             idLabel.setFont(ttfFont.deriveFont(Font.BOLD, 20f));
         } catch (Exception ex) {
             idLabel.setFont(new Font("SansSerif", Font.BOLD, 20));
         }
-        idLabel.setBounds(5, 25, 75, 40);
         box2.add(idLabel);
 
         JTextField idField = new JTextField();
-        try {
-            Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
-            idField.setFont(ttfFont.deriveFont(Font.PLAIN, 16f));
-        } catch (Exception ex) {
-            idField.setFont(new Font("SansSerif", Font.PLAIN, 16));
-        }
         idField.setBounds(80, 25, 210, 40);
         box2.add(idField);
 
         JLabel pwLabel = new JLabel("비밀번호");
+        pwLabel.setBounds(5, 110, 75, 40);
         try {
             Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
             pwLabel.setFont(ttfFont.deriveFont(Font.BOLD, 20f));
         } catch (Exception ex) {
             pwLabel.setFont(new Font("SansSerif", Font.BOLD, 16));
         }
-        pwLabel.setBounds(5, 110, 75, 40);
         box2.add(pwLabel);
 
         JPasswordField pwField = new JPasswordField();
-        try {
-            Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
-            pwField.setFont(ttfFont.deriveFont(Font.PLAIN, 16f));
-        } catch (Exception ex) {
-            pwField.setFont(new Font("SansSerif", Font.PLAIN, 16));
-        }
         pwField.setBounds(80, 110, 210, 40);
         box2.add(pwField);
 
-        // 로그인 버튼 (둥글게 적용 안함)
+        // 로그인 버튼
         JPanel box3 = new JPanel(null);
         box3.setBackground(Color.WHITE);
         box3.setBounds(175, 450, 150, 75);
@@ -131,29 +118,38 @@ public class LoginScreen extends JFrame {
 
         JButton loginBtn = new JButton("로그인");
         loginBtn.setBounds(0, 0, 150, 75);
-        try {
-            Font ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
-            loginBtn.setFont(ttfFont.deriveFont(Font.BOLD, 20f));
-        } catch (Exception ex) {
-            loginBtn.setFont(new Font("SansSerif", Font.BOLD, 20));
-        }
         loginBtn.setBackground(Color.decode("#1B76C0"));
         loginBtn.setForeground(Color.WHITE);
         loginBtn.setFocusPainted(false);
         box3.add(loginBtn);
 
+
+        // 로그인 버튼 동작: 서버에 JOIN 전송 → 층 선택 페이지 이동
         loginBtn.addActionListener(e -> {
-            try {
-                FloorSelectionScreen select = new FloorSelectionScreen();
-                select.setVisible(true);
-                LoginScreen.this.dispose();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                JOptionPane.showMessageDialog(null, "층 선택 화면 생성 실패");
+            String userId = idField.getText().trim();
+
+            if (userId.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "아이디를 입력해주세요");
+                return;
             }
+
+            // (1) JOIN 메시지 생성
+            SocketMessage joinMsg = new SocketMessage();
+            joinMsg.setType("JOIN");
+            joinMsg.setSender(userId);
+            joinMsg.setRole("USER");
+
+            // floor/room은 아직 선택 안 했으므로 null
+
+            // (2) 서버에 JOIN 전송
+            socketClient.send(joinMsg);
+
+            // (3) 다음 화면으로 소켓 + userId 넘기기
+            FloorSelectionScreen next = new FloorSelectionScreen(socketClient, userId);
+            next.setVisible(true);
+            dispose();
         });
 
         setVisible(true);
     }
 }
-

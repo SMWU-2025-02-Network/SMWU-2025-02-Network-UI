@@ -1,5 +1,7 @@
 package client.ui;
 
+import client.ui.screen.StartScreen;
+
 import javax.swing.*;
 
 public class Main {

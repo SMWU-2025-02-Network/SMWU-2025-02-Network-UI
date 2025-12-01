@@ -1,4 +1,7 @@
-package client.ui;
+package client.ui.screen;
+
+import client.socket.SocketClient;
+import client.socket.SocketMessage;
 
 import javax.swing.*;
 import java.awt.*;
@@ -8,19 +11,31 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
 public class ChatScreen extends JPanel {
+
+    private final SocketClient socketClient;
+    private final String userId;
+    private final int floor;
+    private final String room;
+
     private final JTextArea chatArea;
     private final JTextField inputField;
     private final JButton sendBtn;
     private final DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm:ss");
     private Font ttfFont; // 커스텀 폰트
 
-    public ChatScreen() {
+    // MainScreen에서 socketClient + userId + floor + room을 넘겨받는 버전
+    public ChatScreen(SocketClient socketClient, String userId, int floor, String room) {
+        this.socketClient = socketClient;
+        this.userId = userId;
+        this.floor = floor;
+        this.room = room;
+
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
         setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         setMaximumSize(new Dimension(400, 400));
 
-        //폰트
+        // 폰트
         try {
             ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
         } catch (Exception e) {
@@ -71,10 +86,27 @@ public class ChatScreen extends JPanel {
             public void actionPerformed(ActionEvent e) {
                 String text = inputField.getText().trim();
                 if (text.isEmpty()) return;
-                String time = LocalTime.now().format(timeFmt);
-                chatArea.append(String.format("[%s] 나: %s%n", time, text));
+
+                // 1) 화면에 먼저 내 메시지 추가
+                appendMessage("나", text);
+
+                // 2) 서버로 CHAT 패킷 전송
+                try {
+                    SocketMessage chatMsg = new SocketMessage();
+                    chatMsg.setType("CHAT");
+                    chatMsg.setFloor(floor);
+                    chatMsg.setRoom(room);
+                    chatMsg.setSender(userId);
+                    chatMsg.setRole("USER");
+                    chatMsg.setMsg(text);
+
+                    socketClient.send(chatMsg);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    appendMessage("SYSTEM", "메시지 전송 실패: " + ex.getMessage());
+                }
+
                 inputField.setText("");
-                chatArea.setCaretPosition(chatArea.getDocument().getLength());
             }
         };
 
@@ -82,11 +114,16 @@ public class ChatScreen extends JPanel {
         inputField.addActionListener(sendAction); // 엔터로도 전송
     }
 
-    // 외부에서 메시지를 추가할 때(서버 메시지) 사용
+    /**
+     * 외부(소켓 수신 쓰레드 등)에서 서버 메시지를 추가할 때 사용
+     */
     public void appendMessage(String who, String msg) {
         String time = LocalTime.now().format(timeFmt);
-        chatArea.append(String.format("[%s] %s: %s%n", time, who, msg));
-        chatArea.setCaretPosition(chatArea.getDocument().getLength());
+
+        // Swing UI 스레드에서 안전하게 실행
+        SwingUtilities.invokeLater(() -> {
+            chatArea.append(String.format("[%s] %s: %s%n", time, who, msg));
+            chatArea.setCaretPosition(chatArea.getDocument().getLength());
+        });
     }
 }
-
