@@ -6,29 +6,36 @@ import client.ui.SeatPanel;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SeatMapScreen extends JPanel {
 
-    private final ArrayList<SeatPanel> seats = new ArrayList<>();
+    // 좌석 UI
+    private final List<SeatPanel> seats = new ArrayList<>();
     private final JLabel infoLabel;
-    private final JButton confirmButton, outButton, homeButton, returnButton, changeButton;
+    private final JButton confirmButton;
+    private final JButton outButton;
+    private final JButton homeButton;
+    private final JButton returnButton;
+    private final JButton changeButton;
 
     private SeatPanel selectedSeat = null;
     private SeatPanel mySeat = null;
     private boolean changeMode = false;
 
-    private Font ttfFont;
+    private Font ttfFont; // 커스텀 폰트
 
-    // 소켓 정보
+    // 소켓 관련
     private final SocketClient socketClient;
     private final String userId;
     private final int floor;
     private final String room;
 
+    // ───────────────── 생성자 ─────────────────
     public SeatMapScreen(SocketClient socketClient, String userId, int floor, String room) {
         this.socketClient = socketClient;
         this.userId = userId;
@@ -38,32 +45,13 @@ public class SeatMapScreen extends JPanel {
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
 
-        // 폰트
-        try {
-            ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
-        } catch (Exception e) {
-            ttfFont = new Font("SansSerif", Font.PLAIN, 16);
-        }
+        initFont();
 
-        // ====================== 좌석 그리드 ======================
-        JPanel seatGrid = new JPanel(new GridLayout(0, 5, 10, 10));
-        seatGrid.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        // ===== 좌석 그리드 =====
+        JPanel seatGrid = initSeatGrid();
         add(seatGrid, BorderLayout.CENTER);
 
-        for (int i = 1; i <= 20; i++) {
-            SeatPanel p = new SeatPanel(i);
-            seats.add(p);
-            seatGrid.add(p);
-
-            p.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    onSeatClicked(p);
-                }
-            });
-        }
-
-        // ====================== 하단 패널 ======================
+        // ===== 하단 패널 =====
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         add(bottom, BorderLayout.SOUTH);
@@ -75,6 +63,7 @@ public class SeatMapScreen extends JPanel {
         JPanel btns = new JPanel();
         bottom.add(btns, BorderLayout.SOUTH);
 
+        // 버튼들 (UI 스타일 그대로 유지)
         confirmButton = styledButton("선택완료", "#1B76C0");
         confirmButton.setEnabled(false);
         btns.add(confirmButton);
@@ -95,7 +84,7 @@ public class SeatMapScreen extends JPanel {
         changeButton.setVisible(false);
         btns.add(changeButton);
 
-        // 버튼 이벤트
+        // 버튼 리스너 (UI 로직은 그대로, + 소켓 메시지 전송 추가)
         confirmButton.addActionListener(e -> onConfirm());
         outButton.addActionListener(e -> onAwayStart());
         homeButton.addActionListener(e -> onAwayBack());
@@ -103,6 +92,36 @@ public class SeatMapScreen extends JPanel {
         changeButton.addActionListener(e -> enterChangeMode());
     }
 
+    // ───────────────── 초기 설정 ─────────────────
+
+    private void initFont() {
+        try {
+            ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            ttfFont = new Font("SansSerif", Font.PLAIN, 16);
+        }
+    }
+
+    private JPanel initSeatGrid() {
+        JPanel seatGrid = new JPanel(new GridLayout(0, 5, 10, 10));
+        seatGrid.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        for (int i = 1; i <= 20; i++) {
+            SeatPanel p = new SeatPanel(i);
+            seats.add(p);
+            seatGrid.add(p);
+
+            p.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    onSeatClicked(p);
+                }
+            });
+        }
+
+        return seatGrid;
+    }
 
     private JButton styledButton(String text, String colorHex) {
         JButton btn = new JButton(text);
@@ -114,31 +133,31 @@ public class SeatMapScreen extends JPanel {
         return btn;
     }
 
-
-
-    // ============================================================
-    //  서버 → UI 좌석 업데이트 (SEAT_UPDATE)
-    // ============================================================
+    // ───────────────── 서버 → UI 좌석 업데이트 (SEAT_UPDATE) ─────────────────
     public void applySeatUpdate(List<SocketMessage.SeatInfo> seatInfos) {
         // 전체 초기화
-        for (SeatPanel sp : seats) sp.resetSeat();
+        for (SeatPanel sp : seats) {
+            sp.resetSeat();
+        }
         mySeat = null;
 
         for (SocketMessage.SeatInfo info : seatInfos) {
-            SeatPanel sp = seats.get(info.getSeatNo() - 1);
+            int seatNo = info.getSeatNo();
+            if (seatNo < 1 || seatNo > seats.size()) continue;
 
-            String state = info.getState();
+            SeatPanel sp = seats.get(seatNo - 1);
+
+            String state = info.getState();          // "EMPTY", "IN_USE", "AWAY"
             String uid = info.getUserId();
-            Integer remain = info.getRemainSeconds();
+            Integer remain = info.getRemainSeconds();// 남은 시간(초) or null
 
             boolean isMine = userId.equals(uid);
 
-            //비었을 때
             if ("EMPTY".equals(state)) {
+                // 이미 resetSeat() 했으니 추가 처리 없음
                 continue;
             }
 
-            //사용중
             if ("IN_USE".equals(state)) {
                 if (isMine) {
                     mySeat = sp;
@@ -147,62 +166,80 @@ public class SeatMapScreen extends JPanel {
                 } else {
                     sp.setState(SeatPanel.State.OCCUPIED);
                 }
-            }
-
-            //외출
-            if ("AWAY".equals(state)) {
+            } else if ("AWAY".equals(state)) {
                 int awaySec = (remain != null ? remain : 60 * 60);
-                //내 자리 + 외출
                 if (isMine) {
                     mySeat = sp;
-                    sp.startOutTimer(remain);
-                }
-                //다른 사람 + 외출
-                else {
+                    sp.startOutTimer(awaySec);
+                } else {
                     sp.setState(SeatPanel.State.OCCUPIED);
                     sp.startOutTimer(awaySec);
                 }
             }
         }
 
+        // 서버 상태 기준으로 버튼/라벨 동기화
+        if (mySeat != null) {
+            selectedSeat = null;
+            changeMode = false;
+
+            confirmButton.setVisible(false);
+            confirmButton.setEnabled(false);
+            confirmButton.setText("선택완료");
+
+            outButton.setVisible(true);
+            homeButton.setVisible(true);
+            returnButton.setVisible(true);
+            changeButton.setVisible(true);
+        } else {
+            selectedSeat = null;
+            changeMode = false;
+
+            infoLabel.setText("선택 좌석: -");
+            confirmButton.setVisible(true);
+            confirmButton.setEnabled(false);
+            confirmButton.setText("선택완료");
+
+            outButton.setVisible(false);
+            homeButton.setVisible(false);
+            returnButton.setVisible(false);
+            changeButton.setVisible(false);
+        }
+
         updateInfoLabel();
     }
 
+    // ───────────────── 좌석 클릭 ─────────────────
 
-    // ============================================================
-    //  좌석 선택
-    // ============================================================
-    private void onSeatClicked(SeatPanel p) {
-        // 다른사람 자리 클릭 불가
+    public void onSeatClicked(SeatPanel p) {
+        // 다른 사람 자리 클릭 불가
         if (p.getState() != SeatPanel.State.EMPTY) return;
 
-        // 내 좌석 존재 + 변경 모드가 아니면 선택 불가
-        if (mySeat != null && !changeMode) return;
+        // 내 좌석이 이미 있고, 변경 모드가 아니라면 선택 불가
+        boolean allowSelect = (mySeat == null) || changeMode;
+        if (!allowSelect) return;
 
         if (selectedSeat != null) selectedSeat.resetSeat();
 
         selectedSeat = p;
         selectedSeat.setSelected();
-
-        confirmButton.setVisible(true);
         confirmButton.setEnabled(true);
+        confirmButton.setVisible(true);
 
         confirmButton.setText(changeMode ? "좌석 변경 완료" : "선택완료");
 
         updateInfoLabel();
     }
 
+    // ───────────────── 선택 완료 (CHECKIN / 좌석 변경) ─────────────────
 
-    // ============================================================
-    //  좌석 선택 완료 → CHECKIN / 좌석 변경
-    // ============================================================
     private void onConfirm() {
         if (selectedSeat == null) return;
 
-        int seatNo = selectedSeat.getSeatNumber();
+        int newSeatNo = selectedSeat.getSeatNumber();
 
         if (changeMode && mySeat != null) {
-            // 기존 좌석 CHECKOUT
+            // 1) 서버에 기존 좌석 CHECKOUT 전송
             SocketMessage outMsg = new SocketMessage();
             outMsg.setType("CHECKOUT");
             outMsg.setFloor(floor);
@@ -211,35 +248,65 @@ public class SeatMapScreen extends JPanel {
             outMsg.setUserId(userId);
             socketClient.send(outMsg);
 
-            // 새 좌석 CHECKIN
+            // 2) 서버에 새 좌석 CHECKIN 전송
             SocketMessage inMsg = new SocketMessage();
             inMsg.setType("CHECKIN");
             inMsg.setFloor(floor);
             inMsg.setRoom(room);
-            inMsg.setSeatNo(seatNo);
+            inMsg.setSeatNo(newSeatNo);
             inMsg.setUserId(userId);
             socketClient.send(inMsg);
 
+            // 3) UI 로직은 기존 버전 그대로 (타이머/상태 승계)
+            int remaining = mySeat.getRemainingSeconds();
+            int outRem = mySeat.getOutRemainingSeconds();
+            boolean wasOut = mySeat.isOutActive();
+
+            mySeat.resetSeat();
+
+            mySeat = selectedSeat;
+            mySeat.setMineWithRemaining(remaining);
+            if (wasOut && outRem > 0) mySeat.startOutTimer(outRem);
+
             changeMode = false;
+            selectedSeat = null;
+
+            confirmButton.setVisible(false);
+            confirmButton.setEnabled(false);
+            outButton.setVisible(true);
+            homeButton.setVisible(true);
+            returnButton.setVisible(true);
+            changeButton.setVisible(true);
+            confirmButton.setText("선택완료");
+
+            infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber());
         } else {
+            // 처음 좌석 선택 → CHECKIN
             SocketMessage msg = new SocketMessage();
             msg.setType("CHECKIN");
             msg.setFloor(floor);
             msg.setRoom(room);
-            msg.setSeatNo(seatNo);
+            msg.setSeatNo(newSeatNo);
             msg.setUserId(userId);
             socketClient.send(msg);
-        }
 
-        selectedSeat = null;
-        confirmButton.setVisible(false);
-        confirmButton.setEnabled(false);
+            mySeat = selectedSeat;
+            mySeat.setMineDefault();
+            selectedSeat = null;
+
+            confirmButton.setVisible(false);
+            confirmButton.setEnabled(false);
+            outButton.setVisible(true);
+            homeButton.setVisible(true);
+            returnButton.setVisible(true);
+            changeButton.setVisible(true);
+
+            infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber());
+        }
     }
 
+    // ───────────────── 외출 시작 / 복귀 ─────────────────
 
-    // ============================================================
-    //  외출 시작
-    // ============================================================
     private void onAwayStart() {
         if (mySeat == null) return;
 
@@ -249,14 +316,11 @@ public class SeatMapScreen extends JPanel {
         msg.setRoom(room);
         msg.setSeatNo(mySeat.getSeatNumber());
         msg.setUserId(userId);
-
         socketClient.send(msg);
+
+        mySeat.startOutTimer(60 * 60);
     }
 
-
-    // ============================================================
-    //  외출 복귀
-    // ============================================================
     private void onAwayBack() {
         if (mySeat == null) return;
 
@@ -266,14 +330,13 @@ public class SeatMapScreen extends JPanel {
         msg.setRoom(room);
         msg.setSeatNo(mySeat.getSeatNumber());
         msg.setUserId(userId);
-
         socketClient.send(msg);
+
+        mySeat.stopOutTimer();
     }
 
+    // ───────────────── 좌석 반납 (CHECKOUT) ─────────────────
 
-    // ============================================================
-    //  좌석 반납
-    // ============================================================
     private void onReturn() {
         if (mySeat == null) return;
 
@@ -283,34 +346,39 @@ public class SeatMapScreen extends JPanel {
         msg.setRoom(room);
         msg.setSeatNo(mySeat.getSeatNumber());
         msg.setUserId(userId);
-
         socketClient.send(msg);
 
-        selectedSeat = null;
-    }
-
-
-    // ============================================================
-    //  좌석 변경 모드
-    // ============================================================
-    private void enterChangeMode() {
-        if (mySeat == null) return;
-
-        changeMode = true;
+        mySeat.resetSeat();
+        mySeat = null;
         selectedSeat = null;
 
-        infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber() + " / 선택 좌석: -");
-
+        infoLabel.setText("선택 좌석: -");
         confirmButton.setVisible(true);
         confirmButton.setEnabled(false);
-        confirmButton.setText("좌석 변경 완료");
-
+        confirmButton.setText("선택완료");
         outButton.setVisible(false);
         homeButton.setVisible(false);
         returnButton.setVisible(false);
         changeButton.setVisible(false);
     }
 
+    // ───────────────── 좌석 변경 모드 ─────────────────
+
+    private void enterChangeMode() {
+        if (mySeat == null) return;
+        changeMode = true;
+        infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber() + " / 선택 좌석: -");
+
+        confirmButton.setVisible(true);
+        confirmButton.setEnabled(false);
+        confirmButton.setText("좌석 변경 완료");
+        outButton.setVisible(false);
+        homeButton.setVisible(false);
+        returnButton.setVisible(false);
+        changeButton.setVisible(false);
+    }
+
+    // ───────────────── 라벨 업데이트 ─────────────────
 
     private void updateInfoLabel() {
         if (changeMode && mySeat != null && selectedSeat != null) {

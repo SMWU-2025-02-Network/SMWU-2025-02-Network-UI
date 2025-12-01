@@ -85,6 +85,7 @@ public class MainScreen extends JFrame {
         centerPanel = new JPanel(cardLayout);
         root.add(centerPanel, BorderLayout.CENTER);
 
+
         chatScreen = new ChatScreen(socketClient, userId, floor, room);
         dashScreen = new DashboardScreen();
         seatScreen = new SeatMapScreen(socketClient, userId, floor, room);
