@@ -1,17 +1,41 @@
 package client.ui;
 
+import client.socket.SocketClient;
+
+
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 
 public class StartScreen extends JFrame{
+
+    private SocketClient socketClient;
+
     public StartScreen() {
 
-        //창 띄우기
+        //창 기본 설정
         setTitle("NetLibrary - 시작화면");
         setSize(500, 800);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        2) SocketClient 생성 + 서버 연결
+        try {
+            socketClient = new SocketClient();
+            socketClient.connect("localhost", 5050);   // 서버 IP/포트
+            System.out.println("[UI] 서버 연결 성공");
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(
+                    this,
+                    "서버에 연결할 수 없습니다.\n서버 실행 상태를 확인해주세요.",
+                    "연결 오류",
+                    JOptionPane.ERROR_MESSAGE
+            );
+            // 서버 없으면 프로그램 종료
+            System.exit(1);
+
+        }
 
         JPanel panel = new JPanel(null);
         add(panel);
@@ -86,7 +110,7 @@ public class StartScreen extends JFrame{
 
             startButton.addActionListener(e -> {
                 try {
-                    LoginScreen login = new LoginScreen();
+                    LoginScreen login = new LoginScreen(socketClient);
                     login.setVisible(true);
                     StartScreen.this.dispose();
                 } catch (Exception ex) {
