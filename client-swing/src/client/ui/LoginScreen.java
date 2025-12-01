@@ -1,5 +1,7 @@
 package client.ui;
 
+import client.socket.SocketClient;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -7,7 +9,11 @@ import java.io.File;
 
 public class LoginScreen extends JFrame {
 
-    public LoginScreen() {
+    private final SocketClient socketClient;
+
+    public LoginScreen(SocketClient socketClient) {
+        this.socketClient = socketClient;
+
         setTitle("NetLibrary - 로그인");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(500, 800);

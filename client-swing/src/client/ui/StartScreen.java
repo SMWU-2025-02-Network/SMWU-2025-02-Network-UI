@@ -19,7 +19,7 @@ public class StartScreen extends JFrame{
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        2) SocketClient 생성 + 서버 연결
+        // SocketClient 생성 + 서버 연결
         try {
             socketClient = new SocketClient();
             socketClient.connect("localhost", 5050);   // 서버 IP/포트
