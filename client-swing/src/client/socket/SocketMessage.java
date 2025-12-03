@@ -84,4 +84,5 @@ public class SocketMessage {
 
     public Double getLux() { return lux; }
     public void setLux(Double lux) { this.lux = lux; }
+
 }

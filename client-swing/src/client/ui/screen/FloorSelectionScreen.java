@@ -12,11 +12,13 @@ public class FloorSelectionScreen extends JFrame {
 
     private final SocketClient socketClient;
     private final String userId;
+    private final String role;
 
     // LoginScreen에서 socketClient + userId를 넘겨받음
-    public FloorSelectionScreen(SocketClient socketClient, String userId) {
+    public FloorSelectionScreen(SocketClient socketClient, String userId, String role) {
         this.socketClient = socketClient;
         this.userId = userId;
+        this.role = role;
 
         setTitle("Netlibrary - 층 선택");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -44,7 +46,7 @@ public class FloorSelectionScreen extends JFrame {
         backBtn.setFocusPainted(false);
         backBtn.setOpaque(false);
         backBtn.addActionListener(e -> {
-            new LoginScreen(socketClient); // socket 유지
+            new FloorSelectionScreen(socketClient, userId, role).setVisible(true);
             dispose();
         });
         topBar.add(backBtn, BorderLayout.WEST);
@@ -112,23 +114,26 @@ public class FloorSelectionScreen extends JFrame {
 
             // 버튼 클릭 시 JOIN_ROOM 전송
             btn.addActionListener(e -> {
-                String text = btnNames[index];
+                String text = btnNames[index];   // 예: "6층", "2층 A"
                 int floorNum;
-                String room;
+                String room = null;
 
-                // 버튼에서 floor/room 추출
                 if (text.contains("층")) {
-                    String[] arr = text.split(" ");
+                    String[] arr = text.split(" ");           // ["6층"] 또는 ["2층","A"]
                     floorNum = Integer.parseInt(arr[0].replace("층", ""));
 
-                    // 단일 구역 층은 기본 room 을 "A" 로
                     if (arr.length == 1) {
-                        room = "A";          // ← 원래는 null 이었음
+                        // 3,4,6층처럼 구역이 없는 층 → room 없이 사용 (DB seats.room = NULL)
+                        room = null;
                     } else {
-                        room = arr[1];       // "A" or "B"
+                        // 1,2,5층처럼 A/B 구역 있는 층 → 두 번째 토큰 사용
+                        room = arr[1];                        // "A" or "B"
                     }
                 } else {
-                    JOptionPane.showMessageDialog(this, "층 정보를 읽을 수 없습니다.");
+                    JOptionPane.showMessageDialog(
+                            FloorSelectionScreen.this,
+                            "층 정보를 읽을 수 없습니다."
+                    );
                     return;
                 }
 
@@ -136,18 +141,18 @@ public class FloorSelectionScreen extends JFrame {
                 SocketMessage joinRoom = new SocketMessage();
                 joinRoom.setType("JOIN_ROOM");
                 joinRoom.setFloor(floorNum);
-                joinRoom.setRoom(room);
+                joinRoom.setRoom(room);       // 3·4·6층이면 null, 1·2·5층이면 "A"/"B"
                 joinRoom.setSender(userId);
-                joinRoom.setRole("USER");
+                joinRoom.setRole(role);
 
-                // 서버에 전송
                 socketClient.send(joinRoom);
 
-                // 다음 화면 (MainScreen)으로 이동
-                MainScreen chat = new MainScreen(socketClient, userId, floorNum, room);
+                // 다음 화면으로 이동
+                MainScreen chat = new MainScreen(socketClient, userId, floorNum, room,role);
                 chat.setVisible(true);
                 dispose();
             });
+
 
             floor.add(btn);
         }

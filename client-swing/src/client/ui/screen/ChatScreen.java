@@ -9,6 +9,7 @@ import java.awt.event.ActionEvent;
 import java.io.File;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import javax.swing.text.*;
 
 public class ChatScreen extends JPanel {
 
@@ -16,19 +17,21 @@ public class ChatScreen extends JPanel {
     private final String userId;
     private final int floor;
     private final String room;
+    private final String myRole;
 
-    private final JTextArea chatArea;
+    private final JTextPane chatArea;
     private final JTextField inputField;
     private final JButton sendBtn;
     private final DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm:ss");
     private Font ttfFont; // 커스텀 폰트
 
     // MainScreen에서 socketClient + userId + floor + room을 넘겨받는 버전
-    public ChatScreen(SocketClient socketClient, String userId, int floor, String room) {
+    public ChatScreen(SocketClient socketClient, String userId, int floor, String room, String myRole) {
         this.socketClient = socketClient;
         this.userId = userId;
         this.floor = floor;
         this.room = room;
+        this.myRole = myRole;
 
         setLayout(new BorderLayout());
         setBackground(Color.WHITE);
@@ -44,10 +47,9 @@ public class ChatScreen extends JPanel {
         }
 
         // 채팅 표시 영역
-        chatArea = new JTextArea();
+        // 채팅 표시 영역
+        chatArea = new JTextPane();
         chatArea.setEditable(false);
-        chatArea.setLineWrap(true);
-        chatArea.setWrapStyleWord(true);
         chatArea.setFont(ttfFont.deriveFont(Font.PLAIN, 21f));
         chatArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
@@ -92,7 +94,7 @@ public class ChatScreen extends JPanel {
                     chatMsg.setType("CHAT");
                     chatMsg.setFloor(floor);
                     chatMsg.setRoom(room);
-                    chatMsg.setRole("USER");
+                    chatMsg.setRole(myRole);
 
                     // 여기서 sender = 내 userId (또는 닉네임으로 쓰는 값)
                     chatMsg.setSender(userId);
@@ -101,7 +103,8 @@ public class ChatScreen extends JPanel {
                     socketClient.send(chatMsg);
                 } catch (Exception ex) {
                     ex.printStackTrace();
-                    appendMessage("SYSTEM", "메시지 전송 실패: " + ex.getMessage());
+                    appendMessage("SYSTEM", "메시지 전송 실패: " + ex.getMessage(), false);
+
                 }
 
                 inputField.setText("");
@@ -116,34 +119,49 @@ public class ChatScreen extends JPanel {
     /**
      * 외부(소켓 수신 쓰레드 등)에서 서버 메시지를 추가할 때 사용
      */
-    public void appendMessage(String who, String msg) {
+    public void appendMessage(String who, String msg, boolean isAdmin) {
         String time = LocalTime.now().format(timeFmt);
 
-        // Swing UI 스레드에서 안전하게 실행
         SwingUtilities.invokeLater(() -> {
-            chatArea.append(String.format("[%s] %s: %s%n", time, who, msg));
-            chatArea.setCaretPosition(chatArea.getDocument().getLength());
+            StyledDocument doc = chatArea.getStyledDocument();
+            SimpleAttributeSet attr = new SimpleAttributeSet();
+
+            // 관리자면 파란색, 아니면 기본(검정)
+            if (isAdmin) {
+                StyleConstants.setForeground(attr, Color.BLUE);
+            } else {
+                StyleConstants.setForeground(attr, Color.BLACK);
+            }
+
+            String line = String.format("[%s] %s: %s%n", time, who, msg);
+
+            try {
+                doc.insertString(doc.getLength(), line, attr);
+            } catch (BadLocationException e) {
+                e.printStackTrace();
+            }
+
+            chatArea.setCaretPosition(doc.getLength());
         });
     }
 
     // 서버에서 온 채팅을 추가할 때 사용하는 편의 메서드
-    public void appendChatFromServer(String sender, String msg) {
+    public void appendChatFromServer(String sender, String role, String msg) {
 
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
         String who;
 
-        if (sender == null || sender.isBlank()) {
-            // sender가 비어 있으면 시스템 메시지로 간주
+        if (isAdmin) {
+            // 관리자면 항상 이렇게 (본인이 봐도 동일)
+            who = "관리자";
+        } else if (sender == null || sender.isBlank()) {
             who = "SYSTEM";
         } else if (sender.equals(this.userId)) {
-            // 내가 보낸 메시지면 "나"
             who = "나";
         } else {
-            // 다른 사람이 보낸 메시지면 sender 그대로 (userId/닉네임)
             who = sender;
         }
 
-        appendMessage(who, msg);
+        appendMessage(who, msg, isAdmin);
     }
-
-
 }

@@ -1,6 +1,7 @@
 package client.ui.screen;
 
 import client.socket.SocketClient;
+import client.socket.SocketMessage;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -23,14 +24,16 @@ public class MainScreen extends JFrame {
     private final String userId;
     private final int floor;
     private final String room;
+    private final String role;
     private final String displayFloorName;   // "2층 A" 같은 표시용 텍스트
 
     // FloorSelectionScreen에서 socketClient + userId + floor + room을 넘겨받음
-    public MainScreen(SocketClient socketClient, String userId, int floor, String room) {
+    public MainScreen(SocketClient socketClient, String userId, int floor, String room, String role) {
         this.socketClient = socketClient;
         this.userId = userId;
         this.floor = floor;
         this.room = room;
+        this.role = role;
 
         // "2층", "2층 A" 같은 표시용 이름
         if (floor == 3 || floor == 4 || floor == 6) {
@@ -68,7 +71,7 @@ public class MainScreen extends JFrame {
         backBtn.setOpaque(false);
         backBtn.addActionListener(e -> {
             //  층 선택 화면으로 돌아갈 때도 socketClient, userId 유지
-            new FloorSelectionScreen(socketClient, userId).setVisible(true);
+            new FloorSelectionScreen(socketClient, userId,role).setVisible(true);
             dispose();
         });
         topBar.add(backBtn, BorderLayout.WEST);
@@ -92,7 +95,7 @@ public class MainScreen extends JFrame {
         root.add(centerPanel, BorderLayout.CENTER);
 
 
-        chatScreen = new ChatScreen(socketClient, userId, floor, room);
+        ChatScreen chatScreen = new ChatScreen(socketClient, userId, floor, room, role);
         dashScreen = new DashboardScreen();
         seatScreen = new SeatMapScreen(socketClient, userId, floor, room);
 
@@ -104,14 +107,29 @@ public class MainScreen extends JFrame {
 
         if (socketClient != null) {
             socketClient.setListener(msg -> {
-                // CHAT 메시지면 채팅창에 추가
-                // 채팅 메시지 처리
-                if ("CHAT".equals(msg.getType())) {
-                    String sender = msg.getSender();  // userId 또는 닉네임
-                    String text   = msg.getMsg();
 
-                    // 여기서 '나' / 상대 / SYSTEM 구분해서 출력
-                    chatScreen.appendChatFromServer(sender, text);
+                if ("CHAT".equals(msg.getType())) {
+
+                    String sender = msg.getSender();   // 보낸 userId
+                    String text   = msg.getMsg();
+                    String senderRole   = msg.getRole();     // ★ 관리자/사용자 구분
+
+                    chatScreen.appendChatFromServer(sender, senderRole, text);
+                }
+
+                // 좌석 상태 업데이트
+                else if ("SEAT_UPDATE".equals(msg.getType())) {
+                    // 서버에서 온 좌석 정보 리스트
+                    var seatInfos = msg.getSeats();
+                    System.out.println("[CLIENT] SEAT_UPDATE 수신, seats="
+                            + (seatInfos == null ? "null" : seatInfos.size()));
+
+                    if (seatInfos != null) {
+                        // 스윙 UI는 EDT에서 돌려야 해서 한 번 감싸줌
+                        SwingUtilities.invokeLater(() ->
+                                seatScreen.applySeatUpdate(seatInfos)
+                        );
+                    }
                 }
 
                 // 센서 대시보드 업데이트
@@ -120,14 +138,33 @@ public class MainScreen extends JFrame {
                     Double lux  = msg.getLux();
                     Double co2  = msg.getCo2();
 
+                    System.out.println("[CLIENT] DASHBOARD_UPDATE 수신: "
+                            + "temp=" + temp + ", lux=" + lux + ", co2=" + co2);
+
                     if (temp != null && lux != null && co2 != null) {
                         dashScreen.updateSensorData(temp, lux, co2);
                     }
                 }
 
-                // 나중에 SEAT_UPDATE 같은 것도 여기서 처리 가능
-                // else if ("SEAT_UPDATE".equals(msg.getType())) { ... }
+                else if ("ERROR".equals(msg.getType())) {
+                    JOptionPane.showMessageDialog(
+                            MainScreen.this,
+                            msg.getMsg(),
+                            "좌석 체크인 오류",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+
+                    // 좌석 화면에게도 알려주기 (필요할 때만)
+                    seatScreen.handleCheckinError();
+                }
             });
+
+            // 리스너 세팅이 끝난 뒤, 현재 좌석 상태를 요청
+            SocketMessage req = new SocketMessage();
+            req.setType("SEAT_STATUS_REQUEST");
+            req.setFloor(floor);   // 6
+            req.setRoom(room);     // 3,4,6층이면 null
+            socketClient.send(req);
         }
 
         // ───────────────── 하단 탭 바 ─────────────────

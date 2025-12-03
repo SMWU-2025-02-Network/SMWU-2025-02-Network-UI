@@ -12,8 +12,10 @@ public class LoginScreen extends JFrame {
 
     private final SocketClient socketClient;
 
+
     public LoginScreen(SocketClient socketClient) {
         this.socketClient = socketClient;
+
 
         setTitle("NetLibrary - 로그인");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -139,19 +141,31 @@ public class LoginScreen extends JFrame {
                 return;
             }
 
-            // (1) JOIN 메시지 생성
+            // 1) 로그인 아이디로 role 결정
+            String role;
+            try {
+                int idNum = Integer.parseInt(userId);
+                if (idNum >= 4) {
+                    role = "ADMIN";    // 4,5,6번은 관리자
+                } else {
+                    role = "USER";     // 1,2,3번은 일반 사용자
+                }
+            } catch (NumberFormatException ex) {
+                // 숫자 아이디가 아닐 경우 일단 USER로 처리
+                role = "USER";
+            }
+
+            // 2) JOIN 메시지 생성
             SocketMessage joinMsg = new SocketMessage();
             joinMsg.setType("JOIN");
             joinMsg.setSender(userId);
-            joinMsg.setRole("USER");
+            joinMsg.setRole(role);
 
-            // floor/room은 아직 선택 안 했으므로 null
-
-            // (2) 서버에 JOIN 전송
             socketClient.send(joinMsg);
 
-            // (3) 다음 화면으로 소켓 + userId 넘기기
-            FloorSelectionScreen next = new FloorSelectionScreen(socketClient, userId);
+            // 3) 층 선택 화면으로 이동 (role 전달)
+            FloorSelectionScreen next =
+                    new FloorSelectionScreen(socketClient, userId, role);
             next.setVisible(true);
             dispose();
         });

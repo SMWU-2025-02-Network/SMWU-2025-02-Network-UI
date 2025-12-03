@@ -20,6 +20,16 @@ public class SeatPanel extends JPanel {
 
     private static Font ttfFont; // 폰트
 
+    private boolean mine = false;   // 이 좌석이 내 좌석인지 여부
+
+    public boolean isMine() {
+        return mine;
+    }
+
+    public void setMine(boolean value) {
+        this.mine = value;
+    }
+
     static {
         try {
             ttfFont = Font.createFont(Font.TRUETYPE_FONT, new File("src/resources/omyupretty.ttf"));
@@ -67,13 +77,16 @@ public class SeatPanel extends JPanel {
     public void setSelected() { setState(State.SELECTED); }
 
     public void setMineWithRemaining(int seconds) {
+        this.mine = true;
         stopSeatTimer();
         remainingSeconds = seconds;
         setState(State.MINE);
         startSeatTimer(remainingSeconds);
     }
 
-    public void setMineDefault() { setMineWithRemaining(2 * 60 * 60); }
+    public void setMineDefault() {
+        this.mine = true;
+        setMineWithRemaining(2 * 60 * 60); }
 
     private void startSeatTimer(int seconds) {
         remainingSeconds = seconds;
@@ -152,6 +165,7 @@ public class SeatPanel extends JPanel {
     }
 
     public void resetSeat() {
+        this.mine = false;
         stopSeatTimer();
         if (outTimer != null) { outTimer.stop(); outTimer = null; }
         remainingSeconds = 0;
@@ -168,6 +182,28 @@ public class SeatPanel extends JPanel {
         int s = secs % 60;
         return String.format("%02d:%02d:%02d", hrs, mins, s);
     }
+
+    public void startSharedTimer(int seconds) {
+        // mine 플래그는 건드리지 않고, 단순히 잔여시간만 보여주기
+        remainingSeconds = seconds;
+        if (seatTimer != null) seatTimer.stop();
+
+        seatTimer = new Timer(1000, e -> {
+            if (remainingSeconds <= 0) {
+                seatTimer.stop();
+                seatTimer = null;
+                // 여기서는 resetSeat() 까지 하지는 말고,
+                // 서버에서 SEAT_UPDATE가 오면 그때 상태를 바꿔주는 식으로 써도 됨.
+                timerLabel.setText("");
+            } else {
+                timerLabel.setText(formatTime(remainingSeconds));
+                remainingSeconds--;
+            }
+        });
+        seatTimer.setInitialDelay(0);
+        seatTimer.start();
+    }
+
 }
 
 

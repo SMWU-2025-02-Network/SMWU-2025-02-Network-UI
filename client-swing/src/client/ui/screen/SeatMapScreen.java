@@ -147,14 +147,13 @@ public class SeatMapScreen extends JPanel {
 
             SeatPanel sp = seats.get(seatNo - 1);
 
-            String state = info.getState();          // "EMPTY", "IN_USE", "AWAY"
+            String state = info.getState();
             String uid = info.getUserId();
-            Integer remain = info.getRemainSeconds();// 남은 시간(초) or null
+            Integer remain = info.getRemainSeconds();
 
             boolean isMine = userId.equals(uid);
 
             if ("EMPTY".equals(state)) {
-                // 이미 resetSeat() 했으니 추가 처리 없음
                 continue;
             }
 
@@ -165,6 +164,9 @@ public class SeatMapScreen extends JPanel {
                     else sp.setMineDefault();
                 } else {
                     sp.setState(SeatPanel.State.OCCUPIED);
+                    if (remain != null && remain > 0) {
+                        sp.startSharedTimer(remain);   // 다른 사람 좌석도 남은 시간 표시
+                    }
                 }
             } else if ("AWAY".equals(state)) {
                 int awaySec = (remain != null ? remain : 60 * 60);
@@ -172,11 +174,12 @@ public class SeatMapScreen extends JPanel {
                     mySeat = sp;
                     sp.startOutTimer(awaySec);
                 } else {
-                    sp.setState(SeatPanel.State.OCCUPIED);
-                    sp.startOutTimer(awaySec);
+                    sp.setState(SeatPanel.State.OCCUPIED); // prevState로 저장됨
+                    sp.startOutTimer(awaySec);              // 외출 남은시간 모두에게 표시
                 }
             }
         }
+
 
         // 서버 상태 기준으로 버튼/라벨 동기화
         if (mySeat != null) {
@@ -212,8 +215,16 @@ public class SeatMapScreen extends JPanel {
     // ───────────────── 좌석 클릭 ─────────────────
 
     public void onSeatClicked(SeatPanel p) {
-        // 다른 사람 자리 클릭 불가
-        if (p.getState() != SeatPanel.State.EMPTY) return;
+        // 내 자리가 아닌데 이미 사용중/외출이면: 상태만 보여주고 리턴
+        if (p.getState() != SeatPanel.State.EMPTY && !p.isMine()) {
+            if (p.getState() == SeatPanel.State.OUT) {
+                infoLabel.setText("외출 중 좌석: " + p.getSeatNumber());
+            } else {
+                infoLabel.setText("이용 중 좌석: " + p.getSeatNumber());
+            }
+            // 버튼은 그대로 (내 자리 기준으로만 보이므로 변경 없음)
+            return;
+        }
 
         // 내 좌석이 이미 있고, 변경 모드가 아니라면 선택 불가
         boolean allowSelect = (mySeat == null) || changeMode;
@@ -238,6 +249,7 @@ public class SeatMapScreen extends JPanel {
 
         int newSeatNo = selectedSeat.getSeatNumber();
 
+        // ───────── 좌석 변경 모드일 때 ─────────
         if (changeMode && mySeat != null) {
             // 1) 서버에 기존 좌석 CHECKOUT 전송
             SocketMessage outMsg = new SocketMessage();
@@ -257,31 +269,38 @@ public class SeatMapScreen extends JPanel {
             inMsg.setUserId(userId);
             socketClient.send(inMsg);
 
-            // 3) UI 로직은 기존 버전 그대로 (타이머/상태 승계)
+            // 3) UI 는 “바로 변경된 것처럼” 처리
             int remaining = mySeat.getRemainingSeconds();
-            int outRem = mySeat.getOutRemainingSeconds();
+            int outRem    = mySeat.getOutRemainingSeconds();
             boolean wasOut = mySeat.isOutActive();
 
             mySeat.resetSeat();
 
             mySeat = selectedSeat;
-            mySeat.setMineWithRemaining(remaining);
-            if (wasOut && outRem > 0) mySeat.startOutTimer(outRem);
+            if (remaining > 0) mySeat.setMineWithRemaining(remaining);
+            else mySeat.setMineDefault();
 
-            changeMode = false;
+            if (wasOut && outRem > 0) {
+                mySeat.startOutTimer(outRem);
+            }
+
+            changeMode   = false;
             selectedSeat = null;
 
             confirmButton.setVisible(false);
             confirmButton.setEnabled(false);
+            confirmButton.setText("선택완료");
+
             outButton.setVisible(true);
             homeButton.setVisible(true);
             returnButton.setVisible(true);
             changeButton.setVisible(true);
-            confirmButton.setText("선택완료");
 
             infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber());
-        } else {
-            // 처음 좌석 선택 → CHECKIN
+        }
+
+        // ───────── 처음 체크인 할 때 ─────────
+        else {
             SocketMessage msg = new SocketMessage();
             msg.setType("CHECKIN");
             msg.setFloor(floor);
@@ -290,12 +309,14 @@ public class SeatMapScreen extends JPanel {
             msg.setUserId(userId);
             socketClient.send(msg);
 
+            // ★ 여기서 바로 내 자리로 확정
             mySeat = selectedSeat;
             mySeat.setMineDefault();
             selectedSeat = null;
 
             confirmButton.setVisible(false);
             confirmButton.setEnabled(false);
+
             outButton.setVisible(true);
             homeButton.setVisible(true);
             returnButton.setVisible(true);
@@ -304,6 +325,7 @@ public class SeatMapScreen extends JPanel {
             infoLabel.setText("이용중 좌석: " + mySeat.getSeatNumber());
         }
     }
+
 
     // ───────────────── 외출 시작 / 복귀 ─────────────────
 
@@ -331,7 +353,6 @@ public class SeatMapScreen extends JPanel {
         msg.setSeatNo(mySeat.getSeatNumber());
         msg.setUserId(userId);
         socketClient.send(msg);
-
         mySeat.stopOutTimer();
     }
 
@@ -389,6 +410,26 @@ public class SeatMapScreen extends JPanel {
         } else if (selectedSeat != null) {
             infoLabel.setText("선택 좌석: " + selectedSeat.getSeatNumber());
         } else {
+            infoLabel.setText("선택 좌석: -");
+        }
+    }
+
+    public void handleCheckinError() {
+        // 방금 처음 체크인 시도한 케이스만 고려 (changeMode=false)
+        if (!changeMode && mySeat != null && mySeat.isMine()) {
+            mySeat.resetSeat();
+            mySeat = null;
+            selectedSeat = null;
+
+            confirmButton.setVisible(true);
+            confirmButton.setEnabled(false);
+            confirmButton.setText("선택완료");
+
+            outButton.setVisible(false);
+            homeButton.setVisible(false);
+            returnButton.setVisible(false);
+            changeButton.setVisible(false);
+
             infoLabel.setText("선택 좌석: -");
         }
     }
