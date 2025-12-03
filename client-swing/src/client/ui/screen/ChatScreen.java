@@ -87,17 +87,15 @@ public class ChatScreen extends JPanel {
                 String text = inputField.getText().trim();
                 if (text.isEmpty()) return;
 
-                // 1) 화면에 먼저 내 메시지 추가
-                appendMessage("나", text);
-
-                // 2) 서버로 CHAT 패킷 전송
                 try {
                     SocketMessage chatMsg = new SocketMessage();
                     chatMsg.setType("CHAT");
                     chatMsg.setFloor(floor);
                     chatMsg.setRoom(room);
-                    chatMsg.setSender(userId);
                     chatMsg.setRole("USER");
+
+                    // 여기서 sender = 내 userId (또는 닉네임으로 쓰는 값)
+                    chatMsg.setSender(userId);
                     chatMsg.setMsg(text);
 
                     socketClient.send(chatMsg);
@@ -109,6 +107,7 @@ public class ChatScreen extends JPanel {
                 inputField.setText("");
             }
         };
+
 
         sendBtn.addActionListener(sendAction);
         inputField.addActionListener(sendAction); // 엔터로도 전송
@@ -126,4 +125,25 @@ public class ChatScreen extends JPanel {
             chatArea.setCaretPosition(chatArea.getDocument().getLength());
         });
     }
+
+    // 서버에서 온 채팅을 추가할 때 사용하는 편의 메서드
+    public void appendChatFromServer(String sender, String msg) {
+
+        String who;
+
+        if (sender == null || sender.isBlank()) {
+            // sender가 비어 있으면 시스템 메시지로 간주
+            who = "SYSTEM";
+        } else if (sender.equals(this.userId)) {
+            // 내가 보낸 메시지면 "나"
+            who = "나";
+        } else {
+            // 다른 사람이 보낸 메시지면 sender 그대로 (userId/닉네임)
+            who = sender;
+        }
+
+        appendMessage(who, msg);
+    }
+
+
 }

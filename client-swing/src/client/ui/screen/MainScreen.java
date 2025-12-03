@@ -105,11 +105,13 @@ public class MainScreen extends JFrame {
         if (socketClient != null) {
             socketClient.setListener(msg -> {
                 // CHAT 메시지면 채팅창에 추가
+                // 채팅 메시지 처리
                 if ("CHAT".equals(msg.getType())) {
-                    // SYSTEM, 본인, 다른 유저 모두 여기로 옴
-                    String sender = msg.getSender() != null ? msg.getSender() : "SYSTEM";
-                    String text = msg.getMsg();
-                    chatScreen.appendMessage(sender, text);
+                    String sender = msg.getSender();  // userId 또는 닉네임
+                    String text   = msg.getMsg();
+
+                    // 여기서 '나' / 상대 / SYSTEM 구분해서 출력
+                    chatScreen.appendChatFromServer(sender, text);
                 }
 
                 // 센서 대시보드 업데이트
