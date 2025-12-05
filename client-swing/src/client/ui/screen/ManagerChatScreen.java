@@ -1,4 +1,8 @@
-/*
+package client.ui.screen;
+
+import client.socket.SocketClient;
+import client.socket.SocketMessage;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -8,18 +12,26 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 
 public class ManagerChatScreen extends JFrame {
+
+    private final SocketClient socketClient;
+    private final String userId;
+    private final int floor;
+    private final String room;
+
     private final JTextArea chatArea;
     private final JTextField inputField;
     private final JButton sendBtn;
     private final DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm:ss");
     private Font ttfFont; // 커스텀 폰트
 
-    public ManagerChatScreen() {
+    public ManagerChatScreen(SocketClient socketClient, String userId, int floor, String room) {
+        this.socketClient = socketClient;
+        this.userId = userId;
+        this.floor = floor;
+        this.room = room;
 
         //창 띄우기
-        setTitle("NetLibrary - 관리자 채팅 화면");*/
-/**//*
-
+        setTitle("NetLibrary - 관리자 채팅 화면");
         setSize(500, 800);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -53,7 +65,9 @@ public class ManagerChatScreen extends JFrame {
         backBtn.setFocusPainted(false);
         backBtn.setOpaque(false);
         backBtn.addActionListener(e -> {
-            ManagerScreen ms = new ManagerScreen();
+            // 관리자 메인으로 복귀
+            ManagerScreen ms = new ManagerScreen(socketClient, userId, floor, room, "ADMIN");
+
             ms.setVisible(true);
             dispose();
         });
@@ -119,24 +133,34 @@ public class ManagerChatScreen extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 String text = inputField.getText().trim();
                 if (text.isEmpty()) return;
+
+                // 1) 내 화면에 출력
                 String time = LocalTime.now().format(timeFmt);
-                chatArea.append(String.format("[%s] 나: %s%n", time, text));
+                chatArea.append(String.format("[%s] 나(관리자): %s%n", time, text));
                 inputField.setText("");
                 chatArea.setCaretPosition(chatArea.getDocument().getLength());
+
+                // 2) 서버로 전송
+                SocketMessage msg = new SocketMessage();
+                msg.setType("CHAT");       // 혹은 "MANAGER_CHAT" 타입을 새로 정의해도 됨
+                msg.setRole("ADMIN");
+                msg.setSender(userId);
+                msg.setFloor(floor);
+                msg.setRoom(room);
+                msg.setMsg(text);
+
+                socketClient.send(msg);
             }
         };
 
         sendBtn.addActionListener(sendAction);
         inputField.addActionListener(sendAction); // 엔터로도 전송
-
     }
 
-        // 외부에서 메시지를 추가할 때(서버 메시지) 사용
-        public void appendMessage(String who, String msg) {
-            String time = LocalTime.now().format(timeFmt);
-            chatArea.append(String.format("[%s] %s: %s%n", time, who, msg));
-            chatArea.setCaretPosition(chatArea.getDocument().getLength());
+    // 외부에서(서버 수신) 메시지를 추가할 때 사용
+    public void appendMessage(String who, String msg) {
+        String time = LocalTime.now().format(timeFmt);
+        chatArea.append(String.format("[%s] %s: %s%n", time, who, msg));
+        chatArea.setCaretPosition(chatArea.getDocument().getLength());
     }
 }
-
-*/

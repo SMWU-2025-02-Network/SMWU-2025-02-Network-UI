@@ -8,6 +8,7 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.io.File;
 
+
 public class LoginScreen extends JFrame {
 
     private final SocketClient socketClient;
@@ -15,7 +16,6 @@ public class LoginScreen extends JFrame {
 
     public LoginScreen(SocketClient socketClient) {
         this.socketClient = socketClient;
-
 
         setTitle("NetLibrary - 로그인");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -136,39 +136,80 @@ public class LoginScreen extends JFrame {
         loginBtn.addActionListener(e -> {
             String userId = idField.getText().trim();
 
+            // 0) 아이디 입력 검증
             if (userId.isEmpty()) {
                 JOptionPane.showMessageDialog(this, "아이디를 입력해주세요");
                 return;
             }
 
-            // 1) 로그인 아이디로 role 결정
-            String role;
+            int idNum;
             try {
-                int idNum = Integer.parseInt(userId);
-                if (idNum >= 4) {
-                    role = "ADMIN";    // 4,5,6번은 관리자
-                } else {
-                    role = "USER";     // 1,2,3번은 일반 사용자
-                }
+                idNum = Integer.parseInt(userId);   // 숫자 아이디만 허용
             } catch (NumberFormatException ex) {
-                // 숫자 아이디가 아닐 경우 일단 USER로 처리
-                role = "USER";
+                JOptionPane.showMessageDialog(this, "숫자 아이디만 입력 가능합니다.");
+                return;
             }
 
-            // 2) JOIN 메시지 생성
+            // 1) role 결정 (1~3: USER, 4이상: ADMIN)
+            String role = (idNum >= 4) ? "ADMIN" : "USER";
+
+            // 2) 관리자라면 담당 층/구역 매핑
+            Integer floor = null;
+            String room = null;
+
+            if ("ADMIN".equals(role)) {
+                switch (idNum) {
+                    case 4:  // 관리자A
+                        floor = 1; room = "A"; break;
+                    case 5:  // 관리자B
+                        floor = 1; room = "B"; break;
+                    case 6:  // 관리자C
+                        floor = 2; room = "A"; break;
+                    case 7:  // 새 관리자D
+                        floor = 2; room = "B"; break;
+                    case 8:  // 새 관리자E
+                        floor = 3; room = null; break;
+                    case 9:  // 새 관리자F
+                        floor = 4; room = null; break;
+                    case 10: // 새 관리자G
+                        floor = 5; room = "A"; break;
+                    case 11: // 새 관리자H
+                        floor = 5; room = "B"; break;
+                    case 12: // 새 관리자I
+                        floor = 6; room = null; break;
+                    default:
+                        JOptionPane.showMessageDialog(this, "등록되지 않은 관리자입니다.");
+                        return;
+                }
+            }
+
+            // 3) JOIN 메시지 생성 + 서버 전송
             SocketMessage joinMsg = new SocketMessage();
             joinMsg.setType("JOIN");
             joinMsg.setSender(userId);
             joinMsg.setRole(role);
 
+            // 관리자면 floor/room도 같이 보냄
+            if (floor != null) joinMsg.setFloor(floor);
+            if (room != null)  joinMsg.setRoom(room);
+
             socketClient.send(joinMsg);
 
-            // 3) 층 선택 화면으로 이동 (role 전달)
-            FloorSelectionScreen next =
-                    new FloorSelectionScreen(socketClient, userId, role);
-            next.setVisible(true);
+            // 4) 화면 전환
+            if ("ADMIN".equals(role)) {
+                // 관리자 → 관리자 메인 화면
+                ManagerScreen next =new ManagerScreen(socketClient, userId, floor, room, "ADMIN");
+                next.setVisible(true);
+            } else {
+                // 일반 사용자 → 기존 층 선택 화면
+                FloorSelectionScreen next =
+                        new FloorSelectionScreen(socketClient, userId, role);
+                next.setVisible(true);
+            }
+
             dispose();
         });
+
 
         setVisible(true);
     }
