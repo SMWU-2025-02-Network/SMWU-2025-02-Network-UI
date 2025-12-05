@@ -124,8 +124,8 @@ public class ManagerScreen extends JFrame {
 
         mfloorBtn.addActionListener(e -> {
             try {
-                // 담당층/구역 MainScreen 으로 이동
-                MainScreen main = new MainScreen(socketClient, userId, floor, room, role);
+                MainScreen main =
+                        new MainScreen(socketClient, userId, floor, room, "ADMIN");
                 main.setVisible(true);
                 ManagerScreen.this.dispose();
             } catch (Exception ex) {

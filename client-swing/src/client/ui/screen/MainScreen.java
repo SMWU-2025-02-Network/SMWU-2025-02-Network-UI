@@ -69,11 +69,21 @@ public class MainScreen extends JFrame {
         backBtn.setContentAreaFilled(false);
         backBtn.setFocusPainted(false);
         backBtn.setOpaque(false);
+
         backBtn.addActionListener(e -> {
-            //  층 선택 화면으로 돌아갈 때도 socketClient, userId 유지
-            new FloorSelectionScreen(socketClient, userId,role).setVisible(true);
+            if ("ADMIN".equals(role)) {
+                // 관리자라면 → ManagerScreen 으로 복귀
+                ManagerScreen ms = new ManagerScreen(socketClient, userId, floor, room,role);
+                ms.setVisible(true);
+            } else {
+                // 일반 사용자라면 → 층 선택 화면으로 복귀
+                FloorSelectionScreen fs =
+                        new FloorSelectionScreen(socketClient, userId, role);
+                fs.setVisible(true);
+            }
             dispose();
         });
+
         topBar.add(backBtn, BorderLayout.WEST);
 
         // 상단바 제목
