@@ -1,4 +1,5 @@
 package client.ui.screen;
+//사용자 전용 좌석 화면
 
 import client.socket.SocketClient;
 import client.socket.SocketMessage;
