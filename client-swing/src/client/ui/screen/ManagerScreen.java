@@ -94,7 +94,7 @@ public class ManagerScreen extends JFrame {
         mchatBtn.addActionListener(e -> {
             try {
                 ManagerChatScreen mchat =
-                        new ManagerChatScreen(socketClient, userId, floor, room);
+                        new ManagerChatScreen(socketClient, userId, floor, room, "ADMIN");
                 mchat.setVisible(true);
                 ManagerScreen.this.dispose();
             } catch (Exception ex) {
