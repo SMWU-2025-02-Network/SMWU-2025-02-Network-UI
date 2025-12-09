@@ -148,9 +148,12 @@ public class FloorSelectionScreen extends JFrame {
                 socketClient.send(joinRoom);
 
                 // 다음 화면으로 이동
-                MainScreen chat = new MainScreen(socketClient, userId, floorNum, room,role);
+                MainScreen chat =
+                        new MainScreen(socketClient, userId, floorNum, room, role);
+                chat.setLocation(FloorSelectionScreen.this.getLocation());
                 chat.setVisible(true);
                 dispose();
+
             });
 
 

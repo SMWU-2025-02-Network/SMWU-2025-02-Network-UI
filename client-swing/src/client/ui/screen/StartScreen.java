@@ -110,6 +110,7 @@ public class StartScreen extends JFrame{
             startButton.addActionListener(e -> {
                 try {
                     LoginScreen login = new LoginScreen(socketClient);
+                    login.setLocation(StartScreen.this.getLocation());
                     login.setVisible(true);
                     StartScreen.this.dispose();
                 } catch (Exception ex) {
