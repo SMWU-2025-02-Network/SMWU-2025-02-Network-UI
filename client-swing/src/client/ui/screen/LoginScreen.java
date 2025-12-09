@@ -42,10 +42,14 @@ public class LoginScreen extends JFrame {
         backBtn.setContentAreaFilled(false);
         backBtn.setFocusPainted(false);
         backBtn.setOpaque(false);
+
         backBtn.addActionListener(e -> {
-            new StartScreen();
+            StartScreen start = new StartScreen();
+            start.setLocation(LoginScreen.this.getLocation());
+            start.setVisible(true);
             dispose();
         });
+
         topBar.add(backBtn, BorderLayout.WEST);
 
         // 상단 제목
@@ -197,16 +201,16 @@ public class LoginScreen extends JFrame {
 
             // 4) 화면 전환
             if ("ADMIN".equals(role)) {
-                // 관리자 → 관리자 메인 화면
-                ManagerScreen next =new ManagerScreen(socketClient, userId, floor, room, "ADMIN");
+                ManagerScreen next =
+                        new ManagerScreen(socketClient, userId, floor, room, "ADMIN");
+                next.setLocation(LoginScreen.this.getLocation());
                 next.setVisible(true);
             } else {
-                // 일반 사용자 → 기존 층 선택 화면
                 FloorSelectionScreen next =
                         new FloorSelectionScreen(socketClient, userId, role);
+                next.setLocation(LoginScreen.this.getLocation());
                 next.setVisible(true);
             }
-
             dispose();
         });
 

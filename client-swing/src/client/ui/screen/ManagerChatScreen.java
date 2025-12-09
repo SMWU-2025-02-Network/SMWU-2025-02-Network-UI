@@ -76,10 +76,13 @@ public class ManagerChatScreen extends JFrame {
 
         backBtn.addActionListener(e -> {
             // 관리자 메인으로 복귀
-            ManagerScreen ms = new ManagerScreen(socketClient, userId, floor, room, role);
+            ManagerScreen ms =
+                    new ManagerScreen(socketClient, userId, floor, room, role);
+            ms.setLocation(ManagerChatScreen.this.getLocation());
             ms.setVisible(true);
             dispose();
         });
+
         topBar.add(backBtn, BorderLayout.WEST);
 
         // 상단바 제목

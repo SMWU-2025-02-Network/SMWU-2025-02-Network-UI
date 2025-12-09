@@ -77,11 +77,13 @@ public class MainScreen extends JFrame {
             if ("ADMIN".equals(role)) {
                 // 관리자라면 → ManagerScreen 으로 복귀
                 ManagerScreen ms = new ManagerScreen(socketClient, userId, floor, room, role);
+                ms.setLocation(MainScreen.this.getLocation());
                 ms.setVisible(true);
             } else {
                 // 일반 사용자라면 → 층 선택 화면으로 복귀
                 FloorSelectionScreen fs =
                         new FloorSelectionScreen(socketClient, userId, role);
+                fs.setLocation(MainScreen.this.getLocation());
                 fs.setVisible(true);
             }
             dispose();

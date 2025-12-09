@@ -95,6 +95,7 @@ public class ManagerScreen extends JFrame {
             try {
                 ManagerChatScreen mchat =
                         new ManagerChatScreen(socketClient, userId, floor, room, "ADMIN");
+                mchat.setLocation(ManagerScreen.this.getLocation());
                 mchat.setVisible(true);
                 ManagerScreen.this.dispose();
             } catch (Exception ex) {
@@ -102,6 +103,7 @@ public class ManagerScreen extends JFrame {
                 JOptionPane.showMessageDialog(null, "관리자 채팅 화면 생성 실패");
             }
         });
+
 
         // 담당층 메인 화면 버튼
         JPanel box3 = new JPanel(null);
@@ -126,6 +128,7 @@ public class ManagerScreen extends JFrame {
             try {
                 MainScreen main =
                         new MainScreen(socketClient, userId, floor, room, "ADMIN");
+                main.setLocation(ManagerScreen.this.getLocation());
                 main.setVisible(true);
                 ManagerScreen.this.dispose();
             } catch (Exception ex) {
@@ -133,5 +136,6 @@ public class ManagerScreen extends JFrame {
                 JOptionPane.showMessageDialog(null, "담당층 메인 화면 생성 실패");
             }
         });
+
     }
 }
