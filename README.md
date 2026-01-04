@@ -89,18 +89,29 @@
 
 ## 📁 프로젝트 구조
 ```
-src/
-├─ client/
-│ ├─ ui/
-│ │ ├─ screen/ # 화면 단위 UI (Frame / Panel)
-│ │ └─ component/ # 공통 UI 컴포넌트
-│ ├─ socket/ # TCP 소켓 통신 로직
-│ ├─ dto/ # SocketMessage 등 DTO
-│ └─ util/ # 유틸 클래스
-├─ resources/
-│ ├─ font/ # 커스텀 폰트
-│ └─ image/ # UI 이미지 리소스
-└─ Main.java # 실행 진입점
+client-swing/
+ ├─ .idea/                     # IntelliJ IDEA 설정 파일
+ │   ├─ misc.xml
+ │   ├─ modules.xml
+ │   └─ vcs.xml
+ │
+ ├─ src/
+ │   └─ client/
+ │       ├─ socket/            # TCP 소켓 통신 관련 클래스
+ │       │   ├─ SocketClient.java
+ │       │   └─ SocketMessage.java
+ │       │
+ │       └─ ui/                # Java Swing UI 구성
+ │           ├─ screen/         # 화면 단위 UI (Frame / Screen)
+ │           ├─ Main.java       # UI 실행 진입점
+ │           ├─ RoundedBorder.java
+ │           └─ SeatPanel.java  # 좌석 UI 컴포넌트
+ │
+ ├─ resources/                 # 폰트, 이미지 등 리소스
+ │
+ ├─ .gitignore
+ └─ client-swing.iml
+
 ```
 
 ---
